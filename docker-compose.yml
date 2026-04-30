@@ -1,0 +1,11 @@
+services:
+  chroma:
+    image: chromadb/chroma:1.1.0
+    container_name: graphus-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data
+
+volumes:
+  chroma_data:
