@@ -2,6 +2,13 @@
 
 Graphus is a Java CLI that parses Java + Spring Boot source code, builds a symbol-aware call graph, and indexes symbol chunks into ChromaDB for LLM/RAG retrieval.
 
+## Delegation policy
+
+- Prefer robot subagents for validation and execution orchestration.
+- Core sequence: `robot-business-analyst` (when needed) -> `robot-coordinator` -> implementation robot (`robot-java-coder` or `robot-spring-boot-coder`) -> `robot-java-test-writer` -> `robot-java-code-reviewer`.
+- Enforce verify gates and dependency order from `*.plan.md` before starting dependent groups.
+- Use supporting skills as needed: `codegraph-exploration`, `sequential-thinking`, `java-code-generation`, and commit/PR skills when delivery tasks are requested.
+
 ## Modules
 
 | Module            | Role                                                                      |
