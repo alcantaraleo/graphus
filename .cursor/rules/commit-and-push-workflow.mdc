@@ -1,0 +1,14 @@
+---
+description: Commit and push workflow for this project
+alwaysApply: true
+---
+
+# Commit and Push Workflow
+
+- When the user asks to commit, create a semantic commit message from the actual diff and run `git commit`.
+- Use conventional commit format:
+  - `type(scope): TICKET summary` when a ticket (e.g. `PMP-123`, `BB-456`) can be inferred from branch name.
+  - `type(scope): summary` when no ticket is present in the branch name.
+- Commit message body should summarize intent per changed file in concise, factual lines.
+- Do not run `git push` as part of commit flow.
+- Only run `git push` when the user explicitly asks for push in a separate step.

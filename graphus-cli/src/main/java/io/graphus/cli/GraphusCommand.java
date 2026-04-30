@@ -76,6 +76,7 @@ public final class GraphusCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
+            long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
             Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
@@ -89,25 +90,34 @@ public final class GraphusCommand implements Callable<Integer> {
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
             System.out.println("Clearing existing index...");
+            long clearStartNanos = System.nanoTime();
             graphIndexer.removeAll();
+            System.out.println("Clear time      : " + formatElapsed(clearStartNanos));
 
+            long parseStartNanos = System.nanoTime();
             ParserProgressReporter reporter = new ParserProgressReporter();
             ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
             reporter.complete();
+            System.out.println("Parse time      : " + formatElapsed(parseStartNanos));
 
+            long indexStartNanos = System.nanoTime();
             IndexProgressReporter indexReporter = new IndexProgressReporter();
             int indexedSymbols = graphIndexer.index(parseResult.callGraph(), indexReporter);
             indexReporter.complete();
+            System.out.println("Index time      : " + formatElapsed(indexStartNanos));
 
             System.out.println("Saving checksum registry...");
+            long checksumStartNanos = System.nanoTime();
             FileChecksumRegistry registry = FileChecksumRegistry.empty();
             registry.recomputeAll(repoRoot, normalizedSourceRoots);
             registry.save(resolvedStateDir);
+            System.out.println("Checksum time   : " + formatElapsed(checksumStartNanos));
 
             System.out.println("Parsed files    : " + parseResult.parsedFiles());
             System.out.println("Unresolved calls: " + parseResult.unresolvedCalls());
             System.out.println("Indexed symbols : " + indexedSymbols);
             System.out.println("Registry saved  : " + resolvedStateDir.resolve("checksums.json"));
+            System.out.println("Total time      : " + formatElapsed(totalStartNanos));
             return 0;
         }
     }
@@ -141,6 +151,7 @@ public final class GraphusCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
+            long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
             Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
@@ -151,10 +162,14 @@ public final class GraphusCommand implements Callable<Integer> {
             }
 
             System.out.println("Loading checksum registry...");
+            long loadRegistryStartNanos = System.nanoTime();
             FileChecksumRegistry registry = FileChecksumRegistry.load(resolvedStateDir);
+            System.out.println("Load time       : " + formatElapsed(loadRegistryStartNanos));
 
             System.out.println("Scanning source files for changes...");
+            long scanStartNanos = System.nanoTime();
             FileChangeSet changes = registry.diffAndUpdate(repoRoot, normalizedSourceRoots);
+            System.out.println("Scan time       : " + formatElapsed(scanStartNanos));
 
             int totalFiles = FileChecksumRegistry.discoverJavaFiles(normalizedSourceRoots).size();
             System.out.println("Files scanned   : " + totalFiles);
@@ -175,6 +190,7 @@ public final class GraphusCommand implements Callable<Integer> {
             );
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
+            long removeStartNanos = System.nanoTime();
             int removedFiles = 0;
             for (String filePath : changes.modified()) {
                 graphIndexer.removeByFile(filePath);
@@ -185,22 +201,31 @@ public final class GraphusCommand implements Callable<Integer> {
                 removedFiles++;
             }
             System.out.println("Files removed from index: " + removedFiles);
+            System.out.println("Remove time     : " + formatElapsed(removeStartNanos));
 
             Set<String> toReindex = changes.toReindex();
             int indexedSymbols = 0;
             if (!toReindex.isEmpty()) {
+                long parseStartNanos = System.nanoTime();
                 ParserProgressReporter reporter = new ParserProgressReporter();
                 ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
                 reporter.complete();
+                System.out.println("Parse time      : " + formatElapsed(parseStartNanos));
+
+                long indexStartNanos = System.nanoTime();
                 IndexProgressReporter indexReporter = new IndexProgressReporter();
                 indexedSymbols = graphIndexer.indexForFiles(parseResult.callGraph(), toReindex, indexReporter);
                 indexReporter.complete();
+                System.out.println("Index time      : " + formatElapsed(indexStartNanos));
             }
 
             System.out.println("Saving updated checksum registry...");
+            long checksumStartNanos = System.nanoTime();
             registry.save(resolvedStateDir);
+            System.out.println("Checksum time   : " + formatElapsed(checksumStartNanos));
 
             System.out.println("Symbols indexed : " + indexedSymbols);
+            System.out.println("Total time      : " + formatElapsed(totalStartNanos));
             return 0;
         }
     }
@@ -314,5 +339,20 @@ public final class GraphusCommand implements Callable<Integer> {
                     "Unsupported embedding backend: " + value + ". Use local or openai."
             );
         };
+    }
+
+    private static String formatElapsed(long startNanos) {
+        return formatDuration(Duration.ofNanos(System.nanoTime() - startNanos));
+    }
+
+    private static String formatDuration(Duration duration) {
+        long hours = duration.toHours();
+        long minutes = duration.toMinutesPart();
+        long seconds = duration.toSecondsPart();
+
+        if (hours > 0) {
+            return "%dh %02dm %02ds".formatted(hours, minutes, seconds);
+        }
+        return "%dm %02ds".formatted(minutes, seconds);
     }
 }
