@@ -2,10 +2,12 @@ package io.graphus.parser;
 
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 final class SymbolIdResolver {
@@ -27,12 +29,20 @@ final class SymbolIdResolver {
         try {
             return declaration.resolve().getQualifiedSignature();
         } catch (RuntimeException ignored) {
-            return declaration.findAncestor(ClassOrInterfaceDeclaration.class)
+            return enclosingClass(declaration)
                     .map(SymbolIdResolver::classId)
                     .orElse("unknown-class")
                     + "#"
                     + signature(declaration);
         }
+    }
+
+    static String constructorId(ConstructorDeclaration declaration) {
+        return enclosingClass(declaration)
+                .map(SymbolIdResolver::classId)
+                .orElse("unknown-class")
+                + "#"
+                + signature(declaration);
     }
 
     static String methodId(ResolvedMethodDeclaration declaration) {
@@ -50,6 +60,13 @@ final class SymbolIdResolver {
         return declaration.getNameAsString() + "(" + params + ")";
     }
 
+    static String signature(ConstructorDeclaration declaration) {
+        String params = declaration.getParameters().stream()
+                .map(parameter -> parameter.getType().asString())
+                .collect(Collectors.joining(", "));
+        return declaration.getNameAsString() + "(" + params + ")";
+    }
+
     static String filePath(Node node, Path repositoryRoot) {
         return node.findCompilationUnit()
                 .flatMap(compilationUnit -> compilationUnit.getStorage().map(storage -> {
@@ -60,5 +77,16 @@ final class SymbolIdResolver {
                     return absolutePath.toString();
                 }))
                 .orElse("");
+    }
+
+    private static Optional<ClassOrInterfaceDeclaration> enclosingClass(Node node) {
+        Node current = node;
+        while (current.getParentNode().isPresent()) {
+            current = current.getParentNode().orElseThrow();
+            if (current instanceof ClassOrInterfaceDeclaration declaration) {
+                return Optional.of(declaration);
+            }
+        }
+        return Optional.empty();
     }
 }

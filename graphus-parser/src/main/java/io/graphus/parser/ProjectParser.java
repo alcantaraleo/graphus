@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 public final class ProjectParser {
 
     private final SpringAnnotationExtractor springAnnotationExtractor = new SpringAnnotationExtractor();
+    private final GuiceAnnotationExtractor guiceAnnotationExtractor = new GuiceAnnotationExtractor();
 
     public ProjectParserResult parse(Path repositoryRoot, List<Path> sourceRoots) throws IOException {
         return parse(repositoryRoot, sourceRoots, (file, current, total) -> {});
@@ -32,7 +33,11 @@ public final class ProjectParser {
 
         CallGraph callGraph = new CallGraph();
         ParserContext parserContext = new ParserContext(callGraph);
-        SymbolVisitor symbolVisitor = new SymbolVisitor(springAnnotationExtractor, repositoryRoot.toAbsolutePath().normalize());
+        SymbolVisitor symbolVisitor = new SymbolVisitor(
+                springAnnotationExtractor,
+                guiceAnnotationExtractor,
+                repositoryRoot.toAbsolutePath().normalize()
+        );
 
         List<Path> allJavaFiles = new ArrayList<>();
         for (Path sourceRoot : normalizedSourceRoots) {
@@ -51,7 +56,7 @@ public final class ProjectParser {
         }
 
         CallGraphBuilder callGraphBuilder = new CallGraphBuilder(repositoryRoot.toAbsolutePath().normalize());
-        int unresolvedCalls = callGraphBuilder.buildEdges(callGraph, parserContext.methodIdsByDeclaration());
+        int unresolvedCalls = callGraphBuilder.buildEdges(callGraph, parserContext.callableIdsByDeclaration());
         return new ProjectParserResult(callGraph, parsedFiles, unresolvedCalls);
     }
 

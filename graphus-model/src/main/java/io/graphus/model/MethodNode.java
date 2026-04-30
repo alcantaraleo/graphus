@@ -16,6 +16,7 @@ public final class MethodNode extends SymbolNode {
     private final Set<String> callers = new LinkedHashSet<>();
     private final Set<String> callees = new LinkedHashSet<>();
     private final SpringMetadata springMetadata;
+    private final GuiceMetadata guiceMetadata;
 
     public MethodNode(
             String id,
@@ -30,7 +31,39 @@ public final class MethodNode extends SymbolNode {
             int line,
             SpringMetadata springMetadata
     ) {
-        super(id, SymbolKind.METHOD, filePath, line);
+        this(
+                id,
+                SymbolKind.METHOD,
+                declaringClassId,
+                name,
+                signature,
+                returnType,
+                params,
+                modifiers,
+                annotations,
+                filePath,
+                line,
+                springMetadata,
+                null
+        );
+    }
+
+    public MethodNode(
+            String id,
+            SymbolKind kind,
+            String declaringClassId,
+            String name,
+            String signature,
+            String returnType,
+            List<MethodParam> params,
+            List<String> modifiers,
+            List<String> annotations,
+            String filePath,
+            int line,
+            SpringMetadata springMetadata,
+            GuiceMetadata guiceMetadata
+    ) {
+        super(id, kind == null ? SymbolKind.METHOD : kind, filePath, line);
         this.declaringClassId = declaringClassId;
         this.name = name;
         this.signature = signature;
@@ -39,6 +72,7 @@ public final class MethodNode extends SymbolNode {
         this.modifiers = modifiers == null ? List.of() : List.copyOf(modifiers);
         this.annotations = annotations == null ? List.of() : List.copyOf(annotations);
         this.springMetadata = springMetadata == null ? new SpringMetadata() : springMetadata;
+        this.guiceMetadata = guiceMetadata == null ? new GuiceMetadata() : guiceMetadata;
     }
 
     public String getDeclaringClassId() {
@@ -91,5 +125,9 @@ public final class MethodNode extends SymbolNode {
 
     public SpringMetadata getSpringMetadata() {
         return springMetadata;
+    }
+
+    public GuiceMetadata getGuiceMetadata() {
+        return guiceMetadata;
     }
 }

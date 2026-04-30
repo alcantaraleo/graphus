@@ -1,6 +1,6 @@
 package io.graphus.parser;
 
-import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import io.graphus.model.CallGraph;
@@ -17,14 +17,14 @@ public final class CallGraphBuilder {
         this.repositoryRoot = repositoryRoot;
     }
 
-    public int buildEdges(CallGraph callGraph, Map<MethodDeclaration, String> methodIdsByDeclaration) {
+    public int buildEdges(CallGraph callGraph, Map<CallableDeclaration<?>, String> callableIdsByDeclaration) {
         AtomicInteger unresolvedCalls = new AtomicInteger();
 
-        for (Map.Entry<MethodDeclaration, String> entry : methodIdsByDeclaration.entrySet()) {
-            MethodDeclaration methodDeclaration = entry.getKey();
+        for (Map.Entry<CallableDeclaration<?>, String> entry : callableIdsByDeclaration.entrySet()) {
+            CallableDeclaration<?> declaration = entry.getKey();
             String callerId = entry.getValue();
 
-            for (MethodCallExpr methodCallExpr : methodDeclaration.findAll(MethodCallExpr.class)) {
+            for (MethodCallExpr methodCallExpr : declaration.findAll(MethodCallExpr.class)) {
                 try {
                     String calleeId = SymbolIdResolver.methodId(methodCallExpr);
                     callGraph.addEdge(callerId, calleeId);
