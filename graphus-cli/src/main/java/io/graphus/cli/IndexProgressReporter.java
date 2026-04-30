@@ -18,9 +18,17 @@ public final class IndexProgressReporter implements IndexProgressListener {
         int percent = (boundedCurrent * 100) / total;
         int filled = (BAR_WIDTH * boundedCurrent) / total;
 
-        String bar = "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+        String filledBar = Ansi.style("█".repeat(filled), Ansi.CYAN);
+        String emptyBar = Ansi.style("░".repeat(BAR_WIDTH - filled), Ansi.DIM);
+        String bar = filledBar + emptyBar;
         String target = resolveTarget(chunk);
-        String line = String.format("Indexing symbols: %s %4d%% %s", bar, percent, target);
+        String line = String.format(
+                "%s %s %s %s",
+                Ansi.style("Indexing symbols:", Ansi.BOLD),
+                bar,
+                Ansi.style(String.format("%4d%%", percent), Ansi.BOLD),
+                Ansi.style(target, Ansi.DIM)
+        );
         int paddingLength = Math.max(0, previousLineLength - line.length());
         String padding = " ".repeat(paddingLength);
 

@@ -89,35 +89,35 @@ public final class GraphusCommand implements Callable<Integer> {
             );
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
-            System.out.println("Clearing existing index...");
+            System.out.println(phase("Clearing existing index..."));
             long clearStartNanos = System.nanoTime();
             graphIndexer.removeAll();
-            System.out.println("Clear time      : " + formatElapsed(clearStartNanos));
+            System.out.println(timing("Clear time      : ", formatElapsed(clearStartNanos)));
 
             long parseStartNanos = System.nanoTime();
             ParserProgressReporter reporter = new ParserProgressReporter();
             ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
             reporter.complete();
-            System.out.println("Parse time      : " + formatElapsed(parseStartNanos));
+            System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
 
             long indexStartNanos = System.nanoTime();
             IndexProgressReporter indexReporter = new IndexProgressReporter();
             int indexedSymbols = graphIndexer.index(parseResult.callGraph(), indexReporter);
             indexReporter.complete();
-            System.out.println("Index time      : " + formatElapsed(indexStartNanos));
+            System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
 
-            System.out.println("Saving checksum registry...");
+            System.out.println(phase("Saving checksum registry..."));
             long checksumStartNanos = System.nanoTime();
             FileChecksumRegistry registry = FileChecksumRegistry.empty();
             registry.recomputeAll(repoRoot, normalizedSourceRoots);
             registry.save(resolvedStateDir);
-            System.out.println("Checksum time   : " + formatElapsed(checksumStartNanos));
+            System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
 
-            System.out.println("Parsed files    : " + parseResult.parsedFiles());
-            System.out.println("Unresolved calls: " + parseResult.unresolvedCalls());
-            System.out.println("Indexed symbols : " + indexedSymbols);
-            System.out.println("Registry saved  : " + resolvedStateDir.resolve("checksums.json"));
-            System.out.println("Total time      : " + formatElapsed(totalStartNanos));
+            System.out.println(summary("Parsed files    : ", Integer.toString(parseResult.parsedFiles())));
+            System.out.println(summary("Unresolved calls: ", Integer.toString(parseResult.unresolvedCalls())));
+            System.out.println(summary("Indexed symbols : ", Integer.toString(indexedSymbols)));
+            System.out.println(summary("Registry saved  : ", resolvedStateDir.resolve("checksums.json").toString()));
+            System.out.println(summary("Total time      : ", formatElapsed(totalStartNanos)));
             return 0;
         }
     }
@@ -157,28 +157,28 @@ public final class GraphusCommand implements Callable<Integer> {
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
 
             if (!FileChecksumRegistry.exists(resolvedStateDir)) {
-                System.err.println("No index found. Run 'graphus index' first.");
+                System.err.println(error("No index found. Run 'graphus index' first."));
                 return 1;
             }
 
-            System.out.println("Loading checksum registry...");
+            System.out.println(phase("Loading checksum registry..."));
             long loadRegistryStartNanos = System.nanoTime();
             FileChecksumRegistry registry = FileChecksumRegistry.load(resolvedStateDir);
-            System.out.println("Load time       : " + formatElapsed(loadRegistryStartNanos));
+            System.out.println(timing("Load time       : ", formatElapsed(loadRegistryStartNanos)));
 
-            System.out.println("Scanning source files for changes...");
+            System.out.println(phase("Scanning source files for changes..."));
             long scanStartNanos = System.nanoTime();
             FileChangeSet changes = registry.diffAndUpdate(repoRoot, normalizedSourceRoots);
-            System.out.println("Scan time       : " + formatElapsed(scanStartNanos));
+            System.out.println(timing("Scan time       : ", formatElapsed(scanStartNanos)));
 
             int totalFiles = FileChecksumRegistry.discoverJavaFiles(normalizedSourceRoots).size();
-            System.out.println("Files scanned   : " + totalFiles);
-            System.out.println("Added           : " + changes.added().size());
-            System.out.println("Modified        : " + changes.modified().size());
-            System.out.println("Deleted         : " + changes.deleted().size());
+            System.out.println(summary("Files scanned   : ", Integer.toString(totalFiles)));
+            System.out.println(summary("Added           : ", Integer.toString(changes.added().size())));
+            System.out.println(summary("Modified        : ", Integer.toString(changes.modified().size())));
+            System.out.println(summary("Deleted         : ", Integer.toString(changes.deleted().size())));
 
             if (!changes.hasChanges()) {
-                System.out.println("Nothing to sync. Index is up to date.");
+                System.out.println(phase("Nothing to sync. Index is up to date."));
                 return 0;
             }
 
@@ -200,8 +200,8 @@ public final class GraphusCommand implements Callable<Integer> {
                 graphIndexer.removeByFile(filePath);
                 removedFiles++;
             }
-            System.out.println("Files removed from index: " + removedFiles);
-            System.out.println("Remove time     : " + formatElapsed(removeStartNanos));
+            System.out.println(summary("Files removed from index: ", Integer.toString(removedFiles)));
+            System.out.println(timing("Remove time     : ", formatElapsed(removeStartNanos)));
 
             Set<String> toReindex = changes.toReindex();
             int indexedSymbols = 0;
@@ -210,22 +210,22 @@ public final class GraphusCommand implements Callable<Integer> {
                 ParserProgressReporter reporter = new ParserProgressReporter();
                 ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
                 reporter.complete();
-                System.out.println("Parse time      : " + formatElapsed(parseStartNanos));
+                System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
 
                 long indexStartNanos = System.nanoTime();
                 IndexProgressReporter indexReporter = new IndexProgressReporter();
                 indexedSymbols = graphIndexer.indexForFiles(parseResult.callGraph(), toReindex, indexReporter);
                 indexReporter.complete();
-                System.out.println("Index time      : " + formatElapsed(indexStartNanos));
+                System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
             }
 
-            System.out.println("Saving updated checksum registry...");
+            System.out.println(phase("Saving updated checksum registry..."));
             long checksumStartNanos = System.nanoTime();
             registry.save(resolvedStateDir);
-            System.out.println("Checksum time   : " + formatElapsed(checksumStartNanos));
+            System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
 
-            System.out.println("Symbols indexed : " + indexedSymbols);
-            System.out.println("Total time      : " + formatElapsed(totalStartNanos));
+            System.out.println(summary("Symbols indexed : ", Integer.toString(indexedSymbols)));
+            System.out.println(summary("Total time      : ", formatElapsed(totalStartNanos)));
             return 0;
         }
     }
@@ -256,18 +256,21 @@ public final class GraphusCommand implements Callable<Integer> {
             List<GraphSearchHit> hits = graphIndexer.query(question, topK);
 
             if (hits.isEmpty()) {
-                System.out.println("No results.");
+                System.out.println(phase("No results."));
                 return 0;
             }
 
             int index = 1;
             for (GraphSearchHit hit : hits) {
-                System.out.println("[" + index + "] score=" + hit.score());
+                String header = Ansi.style("[" + index + "]", Ansi.BOLD, Ansi.CYAN)
+                        + " score="
+                        + Ansi.style(Double.toString(hit.score()), Ansi.YELLOW);
+                System.out.println(header);
                 System.out.println(hit.text());
                 if (!hit.metadata().isEmpty()) {
-                    System.out.println("metadata: " + hit.metadata());
+                    System.out.println("metadata: " + Ansi.style(hit.metadata().toString(), Ansi.DIM));
                 }
-                System.out.println("---");
+                System.out.println(Ansi.style("---", Ansi.DIM));
                 index++;
             }
             return 0;
@@ -299,20 +302,20 @@ public final class GraphusCommand implements Callable<Integer> {
 
             String resolvedTarget = resolveTargetSymbol(callGraph, targetSymbol);
             if (resolvedTarget == null) {
-                System.out.println("Target symbol not found: " + targetSymbol);
+                System.out.println(error("Target symbol not found: " + targetSymbol));
                 return 1;
             }
 
             List<String> callers = callGraph.blastRadiusCallers(resolvedTarget, depth);
-            System.out.println("Target: " + resolvedTarget);
-            System.out.println("Depth: " + depth);
+            System.out.println(Ansi.style("Target:", Ansi.BOLD) + " " + Ansi.style(resolvedTarget, Ansi.CYAN));
+            System.out.println(Ansi.style("Depth:", Ansi.BOLD) + " " + Ansi.style(Integer.toString(depth), Ansi.YELLOW));
             if (callers.isEmpty()) {
-                System.out.println("No callers found in blast radius.");
+                System.out.println(phase("No callers found in blast radius."));
                 return 0;
             }
-            System.out.println("Callers:");
+            System.out.println(Ansi.style("Callers:", Ansi.BOLD));
             for (String caller : callers) {
-                System.out.println("- " + caller);
+                System.out.println(Ansi.style("-", Ansi.GREEN) + " " + Ansi.style(caller, Ansi.GREEN));
             }
             return 0;
         }
@@ -343,6 +346,22 @@ public final class GraphusCommand implements Callable<Integer> {
 
     private static String formatElapsed(long startNanos) {
         return formatDuration(Duration.ofNanos(System.nanoTime() - startNanos));
+    }
+
+    private static String phase(String value) {
+        return Ansi.style(value, Ansi.BOLD);
+    }
+
+    private static String timing(String label, String value) {
+        return label + Ansi.style(value, Ansi.YELLOW);
+    }
+
+    private static String summary(String label, String value) {
+        return label + Ansi.style(value, Ansi.BOLD, Ansi.GREEN);
+    }
+
+    private static String error(String value) {
+        return Ansi.style(value, Ansi.BOLD, Ansi.RED);
     }
 
     private static String formatDuration(Duration duration) {
