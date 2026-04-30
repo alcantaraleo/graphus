@@ -47,7 +47,7 @@ public final class CursorAdapter implements ToolAdapter {
                 ### Full Index
 
                 ```bash
-                gradle :graphus-cli:run --args='index --repo . --source src/main/java --collection <collection>'
+                graphus index --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300
                 ```
 
                 Use when there is no previous index or when a full rebuild is requested.
@@ -55,7 +55,7 @@ public final class CursorAdapter implements ToolAdapter {
                 ### Incremental Sync
 
                 ```bash
-                gradle :graphus-cli:run --args='sync --repo . --source src/main/java --collection <collection>'
+                graphus sync --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300
                 ```
 
                 Use after code changes to update only added, modified, and deleted files.
@@ -63,7 +63,7 @@ public final class CursorAdapter implements ToolAdapter {
                 ### Query
 
                 ```bash
-                gradle :graphus-cli:run --args='query "<question>" --collection <collection> --top-k 10'
+                graphus query "<question>" --collection <collection> --top-k 10
                 ```
 
                 Use for natural language retrieval over indexed symbols.
@@ -71,7 +71,7 @@ public final class CursorAdapter implements ToolAdapter {
                 ### Blast Radius
 
                 ```bash
-                gradle :graphus-cli:run --args='blast-radius "<target_symbol>" --repo . --source src/main/java --depth 3'
+                graphus blast-radius "<target_symbol>" --repo . --source src/main/java --depth 3
                 ```
 
                 Use to identify callers that can impact a target symbol.

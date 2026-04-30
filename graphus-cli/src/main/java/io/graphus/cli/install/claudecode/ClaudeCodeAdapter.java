@@ -87,7 +87,7 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 Steps:
                 1. If needed, ask for the Chroma collection name.
                 2. Run:
-                   `gradle :graphus-cli:run --args='index --repo . --source src/main/java --collection <collection>'`
+                   `graphus index --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300`
                 3. Share parsed files, unresolved calls, and indexed symbols from command output.
                 """;
     }
@@ -104,7 +104,7 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 1. If `.graphus/checksums.json` does not exist, run `/project:graphus-index` first.
                 2. If needed, ask for the Chroma collection name.
                 3. Run:
-                   `gradle :graphus-cli:run --args='sync --repo . --source src/main/java --collection <collection>'`
+                   `graphus sync --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300`
                 4. Share counts for added, modified, deleted, and indexed symbols.
                 """;
     }
@@ -121,7 +121,7 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 1. If `$ARGUMENTS` is empty, ask for the question to search.
                 2. If needed, ask for the Chroma collection name.
                 3. Run:
-                   `gradle :graphus-cli:run --args='query "$ARGUMENTS" --collection <collection> --top-k 10'`
+                   `graphus query "$ARGUMENTS" --collection <collection> --top-k 10`
                 4. Summarize the top results and their metadata.
                 """;
     }
@@ -137,7 +137,7 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 Steps:
                 1. If `$ARGUMENTS` is empty, ask for the target symbol (fully qualified method signature or substring).
                 2. Run:
-                   `gradle :graphus-cli:run --args='blast-radius "$ARGUMENTS" --repo . --source src/main/java --depth 3'`
+                   `graphus blast-radius "$ARGUMENTS" --repo . --source src/main/java --depth 3`
                 3. Share the resolved target and caller list.
                 """;
     }

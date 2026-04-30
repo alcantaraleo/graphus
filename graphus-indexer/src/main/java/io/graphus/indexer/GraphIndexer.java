@@ -11,38 +11,51 @@ import dev.langchain4j.store.embedding.chroma.ChromaApiVersion;
 import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import io.graphus.model.CallGraph;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public final class GraphIndexer {
 
+    private static final int DEFAULT_BATCH_SIZE = 500;
+
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> embeddingStore;
     private final SymbolChunkBuilder symbolChunkBuilder;
+    private final int batchSize;
 
     public GraphIndexer(EmbeddingModel embeddingModel, EmbeddingStore<TextSegment> embeddingStore) {
+        this(embeddingModel, embeddingStore, DEFAULT_BATCH_SIZE);
+    }
+
+    public GraphIndexer(EmbeddingModel embeddingModel, EmbeddingStore<TextSegment> embeddingStore, int batchSize) {
         this.embeddingModel = embeddingModel;
         this.embeddingStore = embeddingStore;
         this.symbolChunkBuilder = new SymbolChunkBuilder();
+        this.batchSize = Math.max(1, batchSize);
     }
 
     public static EmbeddingStore<TextSegment> chromaStore(String chromaUrl, String collectionName) {
+        return chromaStore(chromaUrl, collectionName, Duration.ofSeconds(5));
+    }
+
+    public static EmbeddingStore<TextSegment> chromaStore(String chromaUrl, String collectionName, Duration timeout) {
         return ChromaEmbeddingStore.builder()
                 .apiVersion(ChromaApiVersion.V2)
                 .baseUrl(chromaUrl)
                 .collectionName(collectionName)
+                .timeout(timeout)
                 .build();
     }
 
     public int index(CallGraph callGraph) {
+        return index(callGraph, (chunk, current, total) -> {});
+    }
+
+    public int index(CallGraph callGraph, IndexProgressListener progressListener) {
         List<SymbolChunk> chunks = symbolChunkBuilder.build(callGraph);
-        for (SymbolChunk chunk : chunks) {
-            TextSegment segment = TextSegment.from(chunk.text(), chunk.metadata());
-            Embedding embedding = embeddingModel.embed(segment).content();
-            embeddingStore.add(embedding, segment);
-        }
-        return chunks.size();
+        return indexChunks(chunks, progressListener);
     }
 
     /**
@@ -65,19 +78,28 @@ public final class GraphIndexer {
      * Useful for incremental sync where only changed files need re-embedding.
      */
     public int indexForFiles(CallGraph callGraph, Set<String> filePaths) {
-        List<SymbolChunk> chunks = symbolChunkBuilder.build(callGraph);
-        int count = 0;
-        for (SymbolChunk chunk : chunks) {
-            Object fileMeta = chunk.metadata().toMap().get("file");
-            if (fileMeta == null || !filePaths.contains(fileMeta.toString())) {
-                continue;
-            }
-            TextSegment segment = TextSegment.from(chunk.text(), chunk.metadata());
-            Embedding embedding = embeddingModel.embed(segment).content();
-            embeddingStore.add(embedding, segment);
-            count++;
+        return indexForFiles(callGraph, filePaths, (chunk, current, total) -> {});
+    }
+
+    public int indexForFiles(CallGraph callGraph, Set<String> filePaths, IndexProgressListener progressListener) {
+        List<SymbolChunk> filteredChunks = symbolChunkBuilder.build(callGraph, filePaths);
+        return indexChunks(filteredChunks, progressListener);
+    }
+
+    private int indexChunks(List<SymbolChunk> chunks, IndexProgressListener progressListener) {
+        int totalChunks = chunks.size();
+        for (int start = 0; start < totalChunks; start += batchSize) {
+            int endExclusive = Math.min(start + batchSize, totalChunks);
+            List<SymbolChunk> chunkBatch = chunks.subList(start, endExclusive);
+            List<TextSegment> segmentBatch = chunkBatch.stream()
+                    .map(chunk -> TextSegment.from(chunk.text(), chunk.metadata()))
+                    .toList();
+            List<Embedding> embeddings = embeddingModel.embedAll(segmentBatch).content();
+            embeddingStore.addAll(embeddings, segmentBatch);
+            SymbolChunk latestChunk = chunkBatch.get(chunkBatch.size() - 1);
+            progressListener.onSymbolStart(latestChunk, endExclusive, totalChunks);
         }
-        return count;
+        return totalChunks;
     }
 
     public List<GraphSearchHit> query(String question, int topK) {

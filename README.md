@@ -22,8 +22,24 @@ Graphus is a Java CLI that parses Java + Spring Boot source code, builds a symbo
 ## Prerequisites
 
 - Java 21+
-- Gradle wrapper (`./gradlew`) or Gradle installed globally
 - Docker (for local ChromaDB)
+
+## Install
+
+### Homebrew (recommended)
+
+```bash
+brew tap alcantaraleo/homebrew-graphus
+brew install graphus
+```
+
+### Direct JAR
+
+Download `graphus.jar` from GitHub Releases and run it directly:
+
+```bash
+java -jar graphus.jar --help
+```
 
 ## Start ChromaDB
 
@@ -39,6 +55,14 @@ Chroma runs at `http://localhost:8000`.
 ./gradlew build
 ```
 
+Build the distributable fat JAR:
+
+```bash
+./gradlew :graphus-cli:shadowJar
+```
+
+The release artifact is generated at `graphus-cli/build/libs/graphus.jar`.
+
 Run tests only:
 
 ```bash
@@ -52,44 +76,60 @@ Run tests only:
 Clears the Chroma collection, re-parses all source files, and re-indexes all symbols. Also saves a checksum registry for future incremental syncs.
 
 ```bash
-./gradlew :graphus-cli:run --args='index \
+graphus index \
   --repo /path/to/repo \
   --source src/main/java \
   --collection my-repo \
   --chroma-url http://localhost:8000 \
-  --embedding local'
+  --embedding local
 ```
 
-| Option         | Default                 | Description                                |
-| -------------- | ----------------------- | ------------------------------------------ |
-| `--repo`       | `.`                     | Repository root path                       |
-| `--source`     | _(required)_            | Java source root; repeatable               |
-| `--collection` | _(required)_            | Chroma collection name                     |
-| `--chroma-url` | `http://localhost:8000` | Chroma base URL                            |
-| `--embedding`  | `local`                 | Embedding backend: `local` or `openai`     |
-| `--state-dir`  | `{repo}/.graphus`       | Directory where `checksums.json` is stored |
+| Option             | Default                 | Description                                |
+| ------------------ | ----------------------- | ------------------------------------------ |
+| `--repo`           | `.`                     | Repository root path                       |
+| `--source`         | _(required)_            | Java source root; repeatable               |
+| `--collection`     | _(required)_            | Chroma collection name                     |
+| `--chroma-url`     | `http://localhost:8000` | Chroma base URL                            |
+| `--chroma-timeout` | `300`                   | Chroma HTTP timeout in seconds             |
+| `--batch-size`     | `500`                   | Symbols per embedding/index batch          |
+| `--embedding`      | `local`                 | Embedding backend: `local` or `openai`     |
+| `--state-dir`      | `{repo}/.graphus`       | Directory where `checksums.json` is stored |
 
 ### Sync (Incremental Update)
 
 Re-indexes only files that were added, modified, or deleted since the last `index` or `sync`. Requires a prior `index` run.
 
 ```bash
-./gradlew :graphus-cli:run --args='sync \
+graphus sync \
   --repo /path/to/repo \
   --source src/main/java \
-  --collection my-repo'
+  --collection my-repo
 ```
 
 Accepts the same options as `index`. Exits with an error if no checksum registry is found.
 
+### Homebrew release automation
+
+On every GitHub Release publish event, `.github/workflows/publish.yml`:
+
+1. Uploads `graphus.jar` and `graphus` release assets.
+2. Computes SHA-256 for `graphus.jar`.
+3. Updates `Formula/graphus.rb` in the Homebrew tap repo (default `alcantaraleo/homebrew-graphus`) with the release version and checksum.
+4. Commits and pushes the formula bump to the tap.
+
+Required GitHub configuration:
+
+- Repository secret: `HOMEBREW_TAP_TOKEN` (PAT with push access to the tap repository)
+- Optional repository variable: `HOMEBREW_TAP_REPO` (override tap repo; default is `alcantaraleo/homebrew-graphus`)
+
 ### Query Indexed Symbols
 
 ```bash
-./gradlew :graphus-cli:run --args='query \
+graphus query \
   "POST endpoint that creates a user" \
   --collection my-repo \
   --chroma-url http://localhost:8000 \
-  --top-k 10'
+  --top-k 10
 ```
 
 | Option         | Default                 | Description                 |
@@ -104,11 +144,11 @@ Accepts the same options as `index`. Exits with an error if no checksum registry
 Find all callers that transitively reach a target symbol.
 
 ```bash
-./gradlew :graphus-cli:run --args='blast-radius \
+graphus blast-radius \
   "com.example.UserRepository.save(com.example.User)" \
   --repo /path/to/repo \
   --source src/main/java \
-  --depth 3'
+  --depth 3
 ```
 
 If the symbol is not an exact match, Graphus tries a substring match against known symbol IDs.
@@ -118,9 +158,9 @@ If the symbol is not an exact match, Graphus tries a substring match against kno
 Generates integration files for AI coding tools so they can invoke Graphus commands automatically.
 
 ```bash
-./gradlew :graphus-cli:run --args='install \
+graphus install \
   --tool cursor \
-  --project-dir /path/to/project'
+  --project-dir /path/to/project
 ```
 
 | Option          | Description                                                |
@@ -139,7 +179,7 @@ Generates integration files for AI coding tools so they can invoke Graphus comma
 
 ```bash
 export OPENAI_API_KEY=your_key
-./gradlew :graphus-cli:run --args='query "where is user creation logic" --collection my-repo --embedding openai'
+graphus query "where is user creation logic" --collection my-repo --embedding openai
 ```
 
 > Keep the same embedding backend across `index`, `sync`, and `query` for a given collection.

@@ -25,16 +25,52 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build CLI distributions
-        run: ./gradlew :graphus-cli:distZip :graphus-cli:distTar --no-daemon
+      - name: Build CLI fat JAR
+        run: ./gradlew :graphus-cli:shadowJar --no-daemon
 
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" graphus-cli/build/distributions/*.zip graphus-cli/build/distributions/*.tar --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" graphus-cli/build/libs/graphus.jar graphus-cli/src/scripts/graphus --clobber
 
       - name: Publish to GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: ./gradlew publish --no-daemon
+
+      - name: Update Homebrew tap formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap update."
+            exit 0
+          fi
+
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          TAP_REPO="${HOMEBREW_TAP_REPO:-alcantaraleo/homebrew-graphus}"
+
+          echo "Downloading release asset graphus.jar for ${TAG}"
+          gh release download "${TAG}" --repo "${{ github.repository }}" --pattern graphus.jar --dir . --clobber
+          SHA256="$(shasum -a 256 graphus.jar | awk '{print $1}')"
+
+          echo "Updating Formula/graphus.rb in ${TAP_REPO} with version ${VERSION}"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap-repo
+          cp homebrew-graphus/Formula/graphus.rb tap-repo/Formula/graphus.rb
+          perl -0pi -e "s/version \"[^\"]+\"/version \"${VERSION}\"/g; s/sha256 \"[^\"]+\"/sha256 \"${SHA256}\"/g" tap-repo/Formula/graphus.rb
+
+          cd tap-repo
+          if git diff --quiet; then
+            echo "Formula unchanged; nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/graphus.rb
+          git commit -m "graphus ${VERSION}"
+          git push

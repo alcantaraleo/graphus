@@ -21,6 +21,11 @@ public final class ProjectParser {
     private final SpringAnnotationExtractor springAnnotationExtractor = new SpringAnnotationExtractor();
 
     public ProjectParserResult parse(Path repositoryRoot, List<Path> sourceRoots) throws IOException {
+        return parse(repositoryRoot, sourceRoots, (file, current, total) -> {});
+    }
+
+    public ProjectParserResult parse(Path repositoryRoot, List<Path> sourceRoots, ParseProgressListener progressListener)
+            throws IOException {
         List<Path> normalizedSourceRoots = resolveSourceRoots(repositoryRoot, sourceRoots);
         ParserConfiguration parserConfiguration = createParserConfiguration(normalizedSourceRoots);
         StaticJavaParser.setConfiguration(parserConfiguration);
@@ -29,13 +34,20 @@ public final class ProjectParser {
         ParserContext parserContext = new ParserContext(callGraph);
         SymbolVisitor symbolVisitor = new SymbolVisitor(springAnnotationExtractor, repositoryRoot.toAbsolutePath().normalize());
 
-        int parsedFiles = 0;
+        List<Path> allJavaFiles = new ArrayList<>();
         for (Path sourceRoot : normalizedSourceRoots) {
-            for (Path javaFile : listJavaFiles(sourceRoot)) {
-                CompilationUnit compilationUnit = StaticJavaParser.parse(javaFile);
-                symbolVisitor.visit(compilationUnit, parserContext);
-                parsedFiles++;
-            }
+            allJavaFiles.addAll(listJavaFiles(sourceRoot));
+        }
+
+        int parsedFiles = 0;
+        int totalFiles = allJavaFiles.size();
+        for (int index = 0; index < totalFiles; index++) {
+            Path javaFile = allJavaFiles.get(index);
+            progressListener.onFileStart(javaFile, index + 1, totalFiles);
+
+            CompilationUnit compilationUnit = StaticJavaParser.parse(javaFile);
+            symbolVisitor.visit(compilationUnit, parserContext);
+            parsedFiles++;
         }
 
         CallGraphBuilder callGraphBuilder = new CallGraphBuilder(repositoryRoot.toAbsolutePath().normalize());

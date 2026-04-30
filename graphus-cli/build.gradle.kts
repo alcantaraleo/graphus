@@ -1,6 +1,7 @@
 plugins {
     id("graphus.java-conventions")
     application
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 dependencies {
@@ -18,4 +19,19 @@ dependencies {
 
 application {
     mainClass.set("io.graphus.cli.GraphusCommand")
+}
+
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    archiveBaseName.set("graphus")
+    archiveClassifier.set("")
+    archiveVersion.set("")
+    manifest {
+        attributes["Main-Class"] = "io.graphus.cli.GraphusCommand"
+    }
+    mergeServiceFiles()
+}
+
+tasks.named<JavaExec>("run") {
+    // Keep CLI relative paths anchored at the Graphus repository root.
+    workingDir = rootProject.projectDir
 }

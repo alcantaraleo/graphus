@@ -11,6 +11,7 @@ import io.graphus.model.CallGraph;
 import io.graphus.parser.ProjectParser;
 import io.graphus.parser.ProjectParserResult;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -61,6 +62,12 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
         private String chromaUrl;
 
+        @Option(names = "--chroma-timeout", defaultValue = "300", description = "Chroma HTTP timeout in seconds")
+        private int chromaTimeoutSeconds;
+
+        @Option(names = "--batch-size", defaultValue = "500", description = "Number of symbols per embedding/index batch")
+        private int batchSize;
+
         @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
         private String embeddingBackend;
 
@@ -74,17 +81,23 @@ public final class GraphusCommand implements Callable<Integer> {
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
 
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(chromaUrl, collectionName);
-            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore);
+            var embeddingStore = GraphIndexer.chromaStore(
+                    chromaUrl,
+                    collectionName,
+                    Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
+            );
+            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
             System.out.println("Clearing existing index...");
             graphIndexer.removeAll();
 
-            System.out.println("Parsing source files...");
-            ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots);
+            ParserProgressReporter reporter = new ParserProgressReporter();
+            ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
+            reporter.complete();
 
-            System.out.println("Indexing symbols...");
-            int indexedSymbols = graphIndexer.index(parseResult.callGraph());
+            IndexProgressReporter indexReporter = new IndexProgressReporter();
+            int indexedSymbols = graphIndexer.index(parseResult.callGraph(), indexReporter);
+            indexReporter.complete();
 
             System.out.println("Saving checksum registry...");
             FileChecksumRegistry registry = FileChecksumRegistry.empty();
@@ -113,6 +126,12 @@ public final class GraphusCommand implements Callable<Integer> {
 
         @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
         private String chromaUrl;
+
+        @Option(names = "--chroma-timeout", defaultValue = "300", description = "Chroma HTTP timeout in seconds")
+        private int chromaTimeoutSeconds;
+
+        @Option(names = "--batch-size", defaultValue = "500", description = "Number of symbols per embedding/index batch")
+        private int batchSize;
 
         @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
         private String embeddingBackend;
@@ -149,8 +168,12 @@ public final class GraphusCommand implements Callable<Integer> {
             }
 
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(chromaUrl, collectionName);
-            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore);
+            var embeddingStore = GraphIndexer.chromaStore(
+                    chromaUrl,
+                    collectionName,
+                    Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
+            );
+            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
             int removedFiles = 0;
             for (String filePath : changes.modified()) {
@@ -166,10 +189,12 @@ public final class GraphusCommand implements Callable<Integer> {
             Set<String> toReindex = changes.toReindex();
             int indexedSymbols = 0;
             if (!toReindex.isEmpty()) {
-                System.out.println("Parsing source files for re-indexing...");
-                ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots);
-                System.out.println("Indexing changed symbols...");
-                indexedSymbols = graphIndexer.indexForFiles(parseResult.callGraph(), toReindex);
+                ParserProgressReporter reporter = new ParserProgressReporter();
+                ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
+                reporter.complete();
+                IndexProgressReporter indexReporter = new IndexProgressReporter();
+                indexedSymbols = graphIndexer.indexForFiles(parseResult.callGraph(), toReindex, indexReporter);
+                indexReporter.complete();
             }
 
             System.out.println("Saving updated checksum registry...");
@@ -242,7 +267,9 @@ public final class GraphusCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
             ProjectParser projectParser = new ProjectParser();
-            ProjectParserResult parseResult = projectParser.parse(repositoryRoot, sourceRoots);
+            ParserProgressReporter reporter = new ParserProgressReporter();
+            ProjectParserResult parseResult = projectParser.parse(repositoryRoot, sourceRoots, reporter);
+            reporter.complete();
             CallGraph callGraph = parseResult.callGraph();
 
             String resolvedTarget = resolveTargetSymbol(callGraph, targetSymbol);

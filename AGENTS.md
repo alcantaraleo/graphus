@@ -24,10 +24,27 @@ See [Architecture](docs/architecture.md) for full class breakdown and data flow.
 | `install`      | Write AI tool integration files (`cursor`, `claude-code`)            |
 
 ```bash
-./gradlew :graphus-cli:run --args='<command> [options]'
+graphus <command> [options]
 ```
 
 See [README](README.md) for full option tables and examples.
+
+## Distribution Convention
+
+Any change to how Graphus is built, packaged, or distributed — including changes to build tasks, release artifact type, wrapper scripts, or command invocation syntax — must update all of the following in the same change:
+
+1. `graphus-cli/src/main/java/io/graphus/cli/install/cursor/CursorAdapter.java` command examples for generated `.cursor/rules/graphus.mdc`
+2. `graphus-cli/src/main/java/io/graphus/cli/install/claudecode/ClaudeCodeAdapter.java` command examples for generated `.claude/commands/graphus-*.md`
+3. `README.md` and this `AGENTS.md` guide so documentation matches real distribution and runtime usage
+
+### Homebrew release flow
+
+- Homebrew distribution uses a separate tap repository (default: `alcantaraleo/homebrew-graphus`).
+- On GitHub Release publish, `.github/workflows/publish.yml` uploads release assets and updates the tap formula (`Formula/graphus.rb`) with:
+  - release version (from tag `vX.Y.Z`)
+  - computed `sha256` of `graphus.jar`
+- Required secret: `HOMEBREW_TAP_TOKEN` with push access to the tap repository.
+- Optional repository variable: `HOMEBREW_TAP_REPO` to override the default tap repository.
 
 ## Key Conventions
 
