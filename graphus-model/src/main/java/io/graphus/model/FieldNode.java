@@ -9,6 +9,7 @@ public final class FieldNode extends SymbolNode {
     private final String type;
     private final List<String> annotations;
     private final SpringMetadata springMetadata;
+    private final GuiceMetadata guiceMetadata;
 
     public FieldNode(
             String id,
@@ -18,7 +19,8 @@ public final class FieldNode extends SymbolNode {
             String filePath,
             int line,
             List<String> annotations,
-            SpringMetadata springMetadata
+            SpringMetadata springMetadata,
+            GuiceMetadata guiceMetadata
     ) {
         super(id, SymbolKind.FIELD, filePath, line);
         this.declaringClassId = declaringClassId;
@@ -26,6 +28,7 @@ public final class FieldNode extends SymbolNode {
         this.type = type;
         this.annotations = annotations == null ? List.of() : List.copyOf(annotations);
         this.springMetadata = springMetadata == null ? new SpringMetadata() : springMetadata;
+        this.guiceMetadata = guiceMetadata == null ? new GuiceMetadata() : guiceMetadata;
     }
 
     public String getDeclaringClassId() {
@@ -46,5 +49,9 @@ public final class FieldNode extends SymbolNode {
 
     public SpringMetadata getSpringMetadata() {
         return springMetadata;
+    }
+
+    public GuiceMetadata getGuiceMetadata() {
+        return guiceMetadata;
     }
 }

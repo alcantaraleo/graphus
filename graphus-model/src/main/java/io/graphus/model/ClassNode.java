@@ -13,6 +13,7 @@ public final class ClassNode extends SymbolNode {
     private final List<String> fields = new ArrayList<>();
     private final List<String> methods = new ArrayList<>();
     private final SpringMetadata springMetadata;
+    private final GuiceMetadata guiceMetadata;
 
     public ClassNode(
             String id,
@@ -22,7 +23,8 @@ public final class ClassNode extends SymbolNode {
             List<String> annotations,
             String superClass,
             List<String> interfaces,
-            SpringMetadata springMetadata
+            SpringMetadata springMetadata,
+            GuiceMetadata guiceMetadata
     ) {
         super(id, SymbolKind.CLASS, filePath, line);
         this.simpleName = simpleName;
@@ -30,6 +32,7 @@ public final class ClassNode extends SymbolNode {
         this.superClass = superClass == null ? "" : superClass;
         this.interfaces = interfaces == null ? List.of() : List.copyOf(interfaces);
         this.springMetadata = springMetadata == null ? new SpringMetadata() : springMetadata;
+        this.guiceMetadata = guiceMetadata == null ? new GuiceMetadata() : guiceMetadata;
     }
 
     public String getSimpleName() {
@@ -66,5 +69,9 @@ public final class ClassNode extends SymbolNode {
 
     public SpringMetadata getSpringMetadata() {
         return springMetadata;
+    }
+
+    public GuiceMetadata getGuiceMetadata() {
+        return guiceMetadata;
     }
 }

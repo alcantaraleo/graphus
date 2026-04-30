@@ -5,6 +5,7 @@ import io.graphus.model.CallGraph;
 import io.graphus.model.ClassNode;
 import io.graphus.model.FieldNode;
 import io.graphus.model.MethodNode;
+import io.graphus.model.SymbolKind;
 import io.graphus.model.SymbolNode;
 import io.graphus.model.UnresolvedNode;
 import java.util.ArrayList;
@@ -48,10 +49,16 @@ public final class SymbolChunkBuilder {
                 .put("line", node.getLine());
 
         if (node instanceof ClassNode classNode) {
-            metadata = metadata.put("spring_stereotype", classNode.getSpringMetadata().getStereotype().name());
+            metadata = metadata
+                    .put("spring_stereotype", classNode.getSpringMetadata().getStereotype().name())
+                    .put("guice_stereotype", classNode.getGuiceMetadata().getStereotype().name());
         } else if (node instanceof MethodNode methodNode) {
             metadata = metadata
                     .put("spring_stereotype", methodNode.getSpringMetadata().getStereotype().name())
+                    .put("guice_stereotype", methodNode.getGuiceMetadata().getStereotype().name())
+                    .put("guice_injection", methodNode.getGuiceMetadata().getInjectionType().name())
+                    .put("guice_singleton", String.valueOf(methodNode.getGuiceMetadata().isSingleton()))
+                    .put("guice_named", methodNode.getGuiceMetadata().getNamedValue())
                     .put("callers", String.join(",", methodNode.getCallers()))
                     .put("callees", String.join(",", methodNode.getCallees()))
                     .put("signature", methodNode.getSignature());
@@ -71,13 +78,18 @@ public final class SymbolChunkBuilder {
             String mappings = methodNode.getSpringMetadata().getHttpMappings().stream()
                     .map(mapping -> mapping.method() + " " + mapping.path())
                     .collect(Collectors.joining(", "));
-            return "[METHOD] " + methodNode.getId() + "\n"
+            String kindLabel = methodNode.getKind() == SymbolKind.CONSTRUCTOR ? "CONSTRUCTOR" : "METHOD";
+            return "[" + kindLabel + "] " + methodNode.getId() + "\n"
                     + "Class: " + methodNode.getDeclaringClassId() + "\n"
                     + "Signature: " + methodNode.getSignature() + "\n"
                     + "Return: " + methodNode.getReturnType() + "\n"
                     + "Parameters: " + methodNode.getParams() + "\n"
                     + "Annotations: " + String.join(", ", methodNode.getAnnotations()) + "\n"
                     + "Spring Stereotype: " + methodNode.getSpringMetadata().getStereotype() + "\n"
+                    + "Guice Stereotype: " + methodNode.getGuiceMetadata().getStereotype() + "\n"
+                    + "Guice Injection: " + methodNode.getGuiceMetadata().getInjectionType() + "\n"
+                    + "Singleton: " + methodNode.getGuiceMetadata().isSingleton() + "\n"
+                    + "Named: " + methodNode.getGuiceMetadata().getNamedValue() + "\n"
                     + "HTTP Mappings: " + mappings + "\n"
                     + "Transactional: " + methodNode.getSpringMetadata().isTransactional() + "\n"
                     + "Callers: " + String.join(", ", methodNode.getCallers()) + "\n"
@@ -91,6 +103,7 @@ public final class SymbolChunkBuilder {
                     + "Superclass: " + classNode.getSuperClass() + "\n"
                     + "Interfaces: " + String.join(", ", classNode.getInterfaces()) + "\n"
                     + "Spring Stereotype: " + classNode.getSpringMetadata().getStereotype() + "\n"
+                    + "Guice Stereotype: " + classNode.getGuiceMetadata().getStereotype() + "\n"
                     + "Fields: " + String.join(", ", classNode.getFields()) + "\n"
                     + "Methods: " + String.join(", ", classNode.getMethods()) + "\n"
                     + "Outgoing Symbols: " + String.join(", ", callGraph.outgoingNeighbors(classNode.getId())) + "\n"
@@ -102,6 +115,7 @@ public final class SymbolChunkBuilder {
                     + "Name: " + fieldNode.getName() + "\n"
                     + "Type: " + fieldNode.getType() + "\n"
                     + "Annotations: " + String.join(", ", fieldNode.getAnnotations()) + "\n"
+                    + "Guice Injection: " + fieldNode.getGuiceMetadata().getInjectionType() + "\n"
                     + "File: " + fieldNode.getFilePath() + ":" + fieldNode.getLine();
         }
         if (node instanceof UnresolvedNode unresolvedNode) {
