@@ -79,7 +79,7 @@ Clears the Chroma collection, re-parses all source files, and re-indexes all sym
 graphus index \
   --repo /path/to/repo \
   --source src/main/java \
-  --collection my-repo \
+  --collection my-repo \ # optional
   --chroma-url http://localhost:8000 \
   --embedding local
 ```
@@ -88,7 +88,7 @@ graphus index \
 | ------------------ | ----------------------- | ------------------------------------------ |
 | `--repo`           | `.`                     | Repository root path                       |
 | `--source`         | _(required)_            | Java source root; repeatable               |
-| `--collection`     | _(required)_            | Chroma collection name                     |
+| `--collection`     | _(repo directory name)_ | Chroma collection name                     |
 | `--chroma-url`     | `http://localhost:8000` | Chroma base URL                            |
 | `--chroma-timeout` | `300`                   | Chroma HTTP timeout in seconds             |
 | `--batch-size`     | `500`                   | Symbols per embedding/index batch          |
@@ -103,10 +103,21 @@ Re-indexes only files that were added, modified, or deleted since the last `inde
 graphus sync \
   --repo /path/to/repo \
   --source src/main/java \
-  --collection my-repo
+  --collection my-repo # optional
 ```
 
 Accepts the same options as `index`. Exits with an error if no checksum registry is found.
+
+| Option             | Default                 | Description                                |
+| ------------------ | ----------------------- | ------------------------------------------ |
+| `--repo`           | `.`                     | Repository root path                       |
+| `--source`         | _(required)_            | Java source root; repeatable               |
+| `--collection`     | _(repo directory name)_ | Chroma collection name                     |
+| `--chroma-url`     | `http://localhost:8000` | Chroma base URL                            |
+| `--chroma-timeout` | `300`                   | Chroma HTTP timeout in seconds             |
+| `--batch-size`     | `500`                   | Symbols per embedding/index batch          |
+| `--embedding`      | `local`                 | Embedding backend: `local` or `openai`     |
+| `--state-dir`      | `{repo}/.graphus`       | Directory where `checksums.json` is stored |
 
 ### Homebrew release automation
 
@@ -127,17 +138,17 @@ Required GitHub configuration:
 ```bash
 graphus query \
   "POST endpoint that creates a user" \
-  --collection my-repo \
+  --collection my-repo \ # optional
   --chroma-url http://localhost:8000 \
   --top-k 10
 ```
 
-| Option         | Default                 | Description                 |
-| -------------- | ----------------------- | --------------------------- |
-| `--collection` | _(required)_            | Chroma collection name      |
-| `--chroma-url` | `http://localhost:8000` | Chroma base URL             |
-| `--embedding`  | `local`                 | Embedding backend           |
-| `--top-k`      | `10`                    | Number of results to return |
+| Option         | Default                    | Description                 |
+| -------------- | -------------------------- | --------------------------- |
+| `--collection` | _(current directory name)_ | Chroma collection name      |
+| `--chroma-url` | `http://localhost:8000`    | Chroma base URL             |
+| `--embedding`  | `local`                    | Embedding backend           |
+| `--top-k`      | `10`                       | Number of results to return |
 
 ### Blast Radius (Callers)
 
@@ -179,7 +190,7 @@ graphus install \
 
 ```bash
 export OPENAI_API_KEY=your_key
-graphus query "where is user creation logic" --collection my-repo --embedding openai
+graphus query "where is user creation logic" --collection my-repo --embedding openai  # --collection optional
 ```
 
 > Keep the same embedding backend across `index`, `sync`, and `query` for a given collection.

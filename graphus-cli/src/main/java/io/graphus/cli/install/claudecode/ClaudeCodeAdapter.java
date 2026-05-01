@@ -85,10 +85,10 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 Run a full Graphus index for the current repository.
 
                 Steps:
-                1. If needed, ask for the Chroma collection name.
-                2. Run:
-                   `graphus index --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300`
-                3. Share parsed files, unresolved calls, and indexed symbols from command output.
+                1. Run:
+                   `graphus index --repo . --source src/main/java --batch-size 500 --chroma-timeout 300`
+                   `--collection` is optional and defaults to the repository directory name. Pass it explicitly only when targeting a collection with a different name.
+                2. Share parsed files, unresolved calls, and indexed symbols from command output.
                 """;
     }
 
@@ -102,10 +102,10 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
 
                 Steps:
                 1. If `.graphus/checksums.json` does not exist, run `/project:graphus-index` first.
-                2. If needed, ask for the Chroma collection name.
-                3. Run:
-                   `graphus sync --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300`
-                4. Share counts for added, modified, deleted, and indexed symbols.
+                2. Run:
+                   `graphus sync --repo . --source src/main/java --batch-size 500 --chroma-timeout 300`
+                   `--collection` is optional and defaults to the repository directory name. Pass it explicitly only when targeting a collection with a different name.
+                3. Share counts for added, modified, deleted, and indexed symbols.
                 """;
     }
 
@@ -119,10 +119,10 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
 
                 Steps:
                 1. If `$ARGUMENTS` is empty, ask for the question to search.
-                2. If needed, ask for the Chroma collection name.
-                3. Run:
-                   `graphus query "$ARGUMENTS" --collection <collection> --top-k 10`
-                4. Summarize the top results and their metadata.
+                2. Run:
+                   `graphus query "$ARGUMENTS" --top-k 10`
+                   `--collection` is optional and defaults to the current directory name. Pass it explicitly only when targeting a collection with a different name.
+                3. Summarize the top results and their metadata.
                 """;
     }
 

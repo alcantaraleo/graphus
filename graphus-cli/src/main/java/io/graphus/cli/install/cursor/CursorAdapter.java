@@ -47,26 +47,26 @@ public final class CursorAdapter implements ToolAdapter {
                 ### Full Index
 
                 ```bash
-                graphus index --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300
+                graphus index --repo . --source src/main/java --batch-size 500 --chroma-timeout 300
                 ```
 
-                Use when there is no previous index or when a full rebuild is requested.
+                Use when there is no previous index or when a full rebuild is requested. `--collection` is optional and defaults to the repository directory name.
 
                 ### Incremental Sync
 
                 ```bash
-                graphus sync --repo . --source src/main/java --collection <collection> --batch-size 500 --chroma-timeout 300
+                graphus sync --repo . --source src/main/java --batch-size 500 --chroma-timeout 300
                 ```
 
-                Use after code changes to update only added, modified, and deleted files.
+                Use after code changes to update only added, modified, and deleted files. `--collection` is optional and defaults to the repository directory name.
 
                 ### Query
 
                 ```bash
-                graphus query "<question>" --collection <collection> --top-k 10
+                graphus query "<question>" --top-k 10
                 ```
 
-                Use for natural language retrieval over indexed symbols.
+                Use for natural language retrieval over indexed symbols. `--collection` is optional and defaults to the current directory name.
 
                 ### Blast Radius
 
@@ -78,7 +78,7 @@ public final class CursorAdapter implements ToolAdapter {
 
                 ## Operating Guidelines
 
-                - Ask for the collection name if the user did not provide one.
+                - `--collection` defaults to the repository/current directory name and can be omitted in most cases. Pass it explicitly only when targeting a collection with a different name.
                 - If `.graphus/checksums.json` is missing, run `index` before `sync`.
                 - Keep embedding backend consistent between index/sync/query for the same collection.
                 - Surface key command output to the user instead of dumping raw logs.
