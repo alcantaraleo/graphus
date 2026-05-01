@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   packages: write
+  issues: write
 
 jobs:
   publish:
@@ -74,3 +75,28 @@ jobs:
           git add Formula/graphus.rb
           git commit -m "graphus ${VERSION}"
           git push
+
+      - name: Close pending-release issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          ISSUES=$(gh issue list \
+            --label "pending-release" \
+            --state open \
+            --json number \
+            --jq '.[].number' \
+            --repo "${{ github.repository }}")
+          if [ -z "$ISSUES" ]; then
+            echo "No pending-release issues found."
+            exit 0
+          fi
+          for NUM in $ISSUES; do
+            gh issue close "$NUM" \
+              --comment "Released in ${TAG}. Closing issue." \
+              --repo "${{ github.repository }}"
+            gh issue edit "$NUM" \
+              --remove-label "pending-release" \
+              --add-label "released" \
+              --repo "${{ github.repository }}"
+          done

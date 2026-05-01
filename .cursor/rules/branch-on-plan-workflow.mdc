@@ -8,7 +8,9 @@ alwaysApply: true
 - When starting work from a plan, create and switch to a new branch before implementation.
 - Infer whether work is feature vs bugfix from the request context.
 - Infer a concise, descriptive branch name from the task scope using lowercase and underscores.
-- Create a new GitHub issue for the planned work, store its id as github-issue-id. The issue should have a concise name inferred from the above steps and a comprehensive description
+- Create a new GitHub issue for the planned work, store its id as github-issue-id. The issue should have a concise name inferred from the above steps and a comprehensive description. Apply the appropriate label when creating the issue:
+  - `feature` / enhancement work → `--label "enhancement"`
+  - `bugfix` work → `--label "bug"`
 - Branch naming pattern must be:
   - `feature/<github-issue-id>` for new features or enhancements.
   - `bugfix/<cgithub-issue-id>` for bug fixes, regressions, or incorrect behavior.

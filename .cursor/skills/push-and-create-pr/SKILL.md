@@ -31,14 +31,14 @@ Use this skill only when the user explicitly asks to push or create a pull reque
 2. Extract issue number from branch name:
    - Branch naming convention: `feature/<issue-number>` or `bugfix/<issue-number>`.
    - Parse the numeric suffix after the last `/` (e.g. `feature/42` → `42`).
-   - If no issue number is found, omit the closing keyword.
+   - If no issue number is found, skip all issue-update steps below.
 3. Verify if branch has an upstream:
    - `git rev-parse --abbrev-ref --symbolic-full-name @{u}`
    - If no upstream, push with `-u`.
 4. Push branch:
    - Existing upstream: `git push`
    - No upstream: `git push -u origin HEAD`
-5. Create PR body with this template (include `Closes` line only when an issue number was found):
+5. Create PR body with this template (do NOT include a `Closes` line — issues are closed by the release workflow, not on merge):
 
 ```markdown
 ## Summary
@@ -51,13 +51,13 @@ Use this skill only when the user explicitly asks to push or create a pull reque
 - [ ] <test item 1>
 - [ ] <test item 2>
 
-Closes #<issue-number>
+Related to #<issue-number>
 ```
 
-6. Create PR with `gh`:
+6. Create PR with `gh` and capture the PR URL:
 
 ```bash
-gh pr create --title "<title>" --body "$(cat <<'EOF'
+PR_URL=$(gh pr create --title "<title>" --body "$(cat <<'EOF'
 ## Summary
 - <bullet 1>
 - <bullet 2>
@@ -66,12 +66,23 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 - [ ] <test item 1>
 - [ ] <test item 2>
 
-Closes #<issue-number>
+Related to #<issue-number>
 EOF
-)"
+)")
+echo "$PR_URL"
 ```
 
-7. Return PR URL and short summary of what was pushed.
+7. If an issue number was found, extract the PR number from the URL (trailing integer) and update the linked issue:
+   - Add the `under-review` label: `gh issue edit <issue-number> --add-label "under-review"`
+   - Post a tracking comment:
+
+```bash
+PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+gh issue edit <issue-number> --add-label "under-review"
+gh issue comment <issue-number> --body "PR #${PR_NUMBER} is open for review. Issue will be closed when the next release is published."
+```
+
+8. Return PR URL and short summary of what was pushed.
 
 ## Title Guidance
 
