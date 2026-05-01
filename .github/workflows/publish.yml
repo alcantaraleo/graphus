@@ -60,7 +60,10 @@ jobs:
           SHA256="$(shasum -a 256 graphus.jar | awk '{print $1}')"
 
           echo "Updating Formula/graphus.rb in ${TAP_REPO} with version ${VERSION}"
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap-repo
+          if ! git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap-repo; then
+            echo "Could not clone ${TAP_REPO}; tap repository may not exist yet. Skipping Homebrew tap update."
+            exit 0
+          fi
           cp homebrew-graphus/Formula/graphus.rb tap-repo/Formula/graphus.rb
           perl -0pi -e "s/version \"[^\"]+\"/version \"${VERSION}\"/g; s/sha256 \"[^\"]+\"/sha256 \"${SHA256}\"/g" tap-repo/Formula/graphus.rb
 
