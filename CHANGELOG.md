@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/alcantaraleo/graphus/compare/v0.4.0...v0.5.0) (2026-05-01)
+
+
+### Features
+
+* **workflow:** automate issue lifecycle labels through plan, PR, and release ([93474ea](https://github.com/alcantaraleo/graphus/commit/93474ea324885d2697bfa8907ad2296ee8745795))
+* **workflow:** automate issue lifecycle labels through plan, PR, and release ([cd99f98](https://github.com/alcantaraleo/graphus/commit/cd99f98700a57e2757644cb1798f4ca9a0435526))
+
+
+### Bug Fixes
+
+* **cli:** disable CLI Maven publication tasks ([c61e937](https://github.com/alcantaraleo/graphus/commit/c61e9378ef0e7222332bcae3028a127b4a517a16))
+* **cli:** disable CLI Maven publication tasks ([60b5bbf](https://github.com/alcantaraleo/graphus/commit/60b5bbf2237d60f2e6f04a19cf02bb8f2a69fce5))
+
 ## [0.4.0](https://github.com/alcantaraleo/graphus/compare/v0.3.0...v0.4.0) (2026-05-01)
 
 
