@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/alcantaraleo/graphus/compare/v0.3.0...v0.4.0) (2026-05-01)
+
+
+### Features
+
+* **cli:** default --collection to directory name when omitted ([339ae22](https://github.com/alcantaraleo/graphus/commit/339ae22cad6ea12333a397ef3a3b60794b2253ce))
+* **cli:** default --collection to directory name when omitted ([121c872](https://github.com/alcantaraleo/graphus/commit/121c872064a930f94d717c2f23f19540cd2e77ce))
+
 ## [0.3.0](https://github.com/alcantaraleo/graphus/compare/v0.2.0...v0.3.0) (2026-04-30)
 
 
