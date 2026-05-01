@@ -28,13 +28,17 @@ Use this skill only when the user explicitly asks to push or create a pull reque
    - `git branch --show-current`
    - `git status --short`
    - `git log --oneline --decorate -n 10`
-2. Verify if branch has an upstream:
+2. Extract issue number from branch name:
+   - Branch naming convention: `feature/<issue-number>` or `bugfix/<issue-number>`.
+   - Parse the numeric suffix after the last `/` (e.g. `feature/42` → `42`).
+   - If no issue number is found, omit the closing keyword.
+3. Verify if branch has an upstream:
    - `git rev-parse --abbrev-ref --symbolic-full-name @{u}`
    - If no upstream, push with `-u`.
-3. Push branch:
+4. Push branch:
    - Existing upstream: `git push`
    - No upstream: `git push -u origin HEAD`
-4. Create PR body with this template:
+5. Create PR body with this template (include `Closes` line only when an issue number was found):
 
 ```markdown
 ## Summary
@@ -46,9 +50,11 @@ Use this skill only when the user explicitly asks to push or create a pull reque
 
 - [ ] <test item 1>
 - [ ] <test item 2>
+
+Closes #<issue-number>
 ```
 
-5. Create PR with `gh`:
+6. Create PR with `gh`:
 
 ```bash
 gh pr create --title "<title>" --body "$(cat <<'EOF'
@@ -59,11 +65,13 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 ## Test plan
 - [ ] <test item 1>
 - [ ] <test item 2>
+
+Closes #<issue-number>
 EOF
 )"
 ```
 
-6. Return PR URL and short summary of what was pushed.
+7. Return PR URL and short summary of what was pushed.
 
 ## Title Guidance
 
