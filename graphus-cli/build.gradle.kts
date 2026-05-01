@@ -1,3 +1,5 @@
+import org.gradle.api.publish.maven.tasks.AbstractPublishToMaven
+
 plugins {
     id("graphus.java-conventions")
     application
@@ -34,4 +36,8 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 tasks.named<JavaExec>("run") {
     // Keep CLI relative paths anchored at the Graphus repository root.
     workingDir = rootProject.projectDir
+}
+
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    enabled = false
 }
