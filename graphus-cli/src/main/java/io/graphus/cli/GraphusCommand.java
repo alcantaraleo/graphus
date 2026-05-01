@@ -11,6 +11,7 @@ import io.graphus.model.CallGraph;
 import io.graphus.parser.ProjectParser;
 import io.graphus.parser.ProjectParserResult;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,7 +57,7 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--source", description = "Java source root; can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
-        @Option(names = "--collection", required = true, description = "Chroma collection name")
+        @Option(names = "--collection", description = "Chroma collection name (default: top-level directory name of --repo)")
         private String collectionName;
 
         @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
@@ -78,13 +79,16 @@ public final class GraphusCommand implements Callable<Integer> {
         public Integer call() throws Exception {
             long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
+            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
+                    ? collectionName
+                    : repoRoot.getFileName().toString();
             Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
 
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
             var embeddingStore = GraphIndexer.chromaStore(
                     chromaUrl,
-                    collectionName,
+                    resolvedCollectionName,
                     Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
             );
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
@@ -131,7 +135,7 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--source", description = "Java source root; can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
-        @Option(names = "--collection", required = true, description = "Chroma collection name")
+        @Option(names = "--collection", description = "Chroma collection name (default: top-level directory name of --repo)")
         private String collectionName;
 
         @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
@@ -153,6 +157,9 @@ public final class GraphusCommand implements Callable<Integer> {
         public Integer call() throws Exception {
             long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
+            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
+                    ? collectionName
+                    : repoRoot.getFileName().toString();
             Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
             List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
 
@@ -185,7 +192,7 @@ public final class GraphusCommand implements Callable<Integer> {
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
             var embeddingStore = GraphIndexer.chromaStore(
                     chromaUrl,
-                    collectionName,
+                    resolvedCollectionName,
                     Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
             );
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
@@ -236,7 +243,7 @@ public final class GraphusCommand implements Callable<Integer> {
         @Parameters(paramLabel = "QUESTION", description = "Natural language query")
         private String question;
 
-        @Option(names = "--collection", required = true, description = "Chroma collection name")
+        @Option(names = "--collection", description = "Chroma collection name (default: current directory name)")
         private String collectionName;
 
         @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
@@ -250,8 +257,11 @@ public final class GraphusCommand implements Callable<Integer> {
 
         @Override
         public Integer call() {
+            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
+                    ? collectionName
+                    : Paths.get("").toAbsolutePath().getFileName().toString();
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(chromaUrl, collectionName);
+            var embeddingStore = GraphIndexer.chromaStore(chromaUrl, resolvedCollectionName);
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore);
             List<GraphSearchHit> hits = graphIndexer.query(question, topK);
 
