@@ -1,0 +1,39 @@
+name: Conventional PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title follows Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Dependabot titles are generated automatically and may not follow this pattern.
+          if [ "${PR_AUTHOR}" = "dependabot[bot]" ]; then
+            echo "Skipping title validation for dependabot."
+            exit 0
+          fi
+
+          if [[ "${PR_TITLE}" =~ ^(feat|fix|chore|docs|refactor|perf|test|build|ci|style|revert)(\([[:alnum:]_./-]+\))?(!)?:\ .+ ]]; then
+            echo "PR title is conventional: ${PR_TITLE}"
+            exit 0
+          fi
+
+          echo "Invalid PR title: ${PR_TITLE}"
+          echo "Expected format: type(scope): description"
+          echo "This repository relies on conventional, parseable commit subjects for predictable Release Please behavior."
+          echo "For releasable user-facing changes, use feat(...) or fix(...)."
+          echo "Prefer squash merge so the PR title becomes the final commit subject on main."
+          echo "Examples:"
+          echo "  feat(cli): add graph export command"
+          echo "  fix(workflow): avoid duplicate release asset upload"
+          echo "  chore(main): release 0.6.0"
+          exit 1
