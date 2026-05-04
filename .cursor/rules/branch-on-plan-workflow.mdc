@@ -13,4 +13,9 @@ alwaysApply: true
   - `bugfix` work → `--label "bug"`
 - Branch naming pattern must be:
   - `feature/<github-issue-id>` for new features or enhancements.
-  - `bugfix/<cgithub-issue-id>` for bug fixes, regressions, or incorrect behavior.
+  - `bugfix/<github-issue-id>` for bug fixes, regressions, or incorrect behavior.
+- PR title must follow Conventional Commits format:
+  - `type(scope): short description`
+  - Allowed types: `feat`, `fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `style`, `revert`
+- For releasable product changes, use `feat(...)` or `fix(...)` commit messages to ensure Release Please detects user-facing updates.
+- Prefer squash merging into `main` so the final commit subject stays parseable and aligned with the PR title convention.
