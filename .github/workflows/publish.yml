@@ -61,7 +61,6 @@ jobs:
 
           echo "Updating Formula/graphus.rb in ${TAP_REPO} with version ${VERSION}"
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap-repo
-          cp homebrew-graphus/Formula/graphus.rb tap-repo/Formula/graphus.rb
           perl -0pi -e "s/version \"[^\"]+\"/version \"${VERSION}\"/g; s/sha256 \"[^\"]+\"/sha256 \"${SHA256}\"/g" tap-repo/Formula/graphus.rb
 
           cd tap-repo
