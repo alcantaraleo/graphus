@@ -26,6 +26,7 @@ import picocli.CommandLine.Parameters;
 @Command(
         name = "graphus",
         mixinStandardHelpOptions = true,
+        versionProvider = VersionProvider.class,
         subcommands = {
                 GraphusCommand.IndexCommand.class,
                 GraphusCommand.SyncCommand.class,
