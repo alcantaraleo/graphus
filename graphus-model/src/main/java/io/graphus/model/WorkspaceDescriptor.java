@@ -38,4 +38,13 @@ public record WorkspaceDescriptor(String name, Path root, List<ModuleDescriptor>
         }
         return Collections.unmodifiableList(sourceRoots);
     }
+
+    /** All {@link ModuleDescriptor#kotlinSourceRoots()} in declaration order. */
+    public List<Path> flattenedKotlinSourceRoots() {
+        List<Path> kotlinRoots = new ArrayList<>();
+        for (ModuleDescriptor module : modules) {
+            kotlinRoots.addAll(module.kotlinSourceRoots());
+        }
+        return Collections.unmodifiableList(kotlinRoots);
+    }
 }

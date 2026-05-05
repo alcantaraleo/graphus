@@ -1,22 +1,27 @@
 # Graphus
 
-Graphus is a Java CLI that parses Java + Spring Boot source code, builds a symbol-aware call graph, and indexes symbol chunks into a **vector store** (ChromaDB by default, or a local SQLite database) for LLM/RAG retrieval.
+Graphus is a Java CLI that parses Java and Kotlin + Spring Boot source code, builds a symbol-aware call graph (including best-effort cross-language edges between Java and Kotlin), and indexes symbol chunks into a **vector store** (ChromaDB by default, or a local SQLite database) for LLM/RAG retrieval.
 
 ## What It Extracts
 
 - Java symbols: classes, fields, methods, parameters, return types, modifiers
-- Call edges: caller -> callee for resolvable `MethodCallExpr` invocations
-- Spring-specific metadata:
-  - Stereotypes: `@Service`, `@Controller`, `@Repository`, `@Configuration`, `@Entity`, `@Component`
+- Kotlin symbols: classes, interfaces, `object` declarations, data classes, top-level functions (under a synthetic `*Kt` file facade), `val`/`var` properties, primary and secondary constructors, function parameters and return types
+- Call edges:
+  - Java → Java: caller → callee for resolvable `MethodCallExpr` invocations
+  - Kotlin → Kotlin: name + arity matching against Kotlin `fun` definitions in the same workspace
+  - Java → Kotlin and Kotlin → Java (best effort): name + arity post-pass over unresolved calls
+- Spring-specific metadata (Java and Kotlin):
+  - Stereotypes: `@Service`, `@Controller`, `@RestController`, `@Repository`, `@Configuration`, `@Entity`, `@Component`
   - HTTP mappings: `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, `@PatchMapping`, `@RequestMapping`
   - Behavior flags: `@Transactional`, `@Async`, `@Scheduled`
   - Injection markers: `@Autowired`, `@Inject`
+- Guice-specific metadata (Java and Kotlin): `@Inject`, `@Singleton`, `@Provides`, `@Named`, plus `MODULE` stereotype for classes extending `AbstractModule`/`PrivateModule`
 
 ## Project Structure
 
-- `graphus-model`: call graph and symbol domain model
-- `graphus-parser`: JavaParser-based project parsing and edge construction
-- `graphus-indexer`: symbol chunk generation, LangChain4j `EmbeddingStore` integration (Chroma or SQLite), incremental sync via checksum registry, and `.graphus/config.json` persistence
+- `graphus-model`: call graph and language-agnostic symbol domain model
+- `graphus-parser`: Java and Kotlin source parsing (JavaParser + Kotlin compiler PSI) and call graph construction, including the cross-language resolver
+- `graphus-indexer`: symbol chunk generation, LangChain4j `EmbeddingStore` integration (Chroma or SQLite), incremental sync via checksum registry (covers `.java` and `.kt` files), and `.graphus/config.json` persistence
 - `graphus-cli`: user-facing commands (`index`, `sync`, `query`, `blast-radius`, `install`)
 
 ## Prerequisites
@@ -92,19 +97,19 @@ graphus index \
   --db sqlite # optional — default chroma Docker / remote Chroma URL
 ```
 
-| Option           | Default                 | Description                                                                                                                  |
-| ---------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `--repo`         | `.`                     | Repository root path                                                                                                          |
-| `--source`       | _(required)_            | Java source root; repeatable                                                                                                  |
-| `--collection`   | _(repo directory name)_ | Logical collection/table name embedded in SQLite + persisted in `config.json`                                                 |
-| `--db`           | persisted or `chroma`   | `chroma` (HTTP server) \| `sqlite` (local JDBC SQLite file — no daemon)                                                      |
-| `--db-url`       | persisted or localhost  | Base URL used when `--db chroma`                                                                                               |
-| `--db-timeout`   | persisted or `300`      | Seconds for Chroma HTTP client when `--db chroma`                                                                            |
-| `--db-file`      | `<state-dir>/graphus.db` | SQLite file path used when `--db sqlite`                                                                                    |
-| `--batch-size`   | `500`                   | Symbols per embedding/index batch                                                                                            |
-| `--embedding`    | persisted or `local`    | Embedding backend: `local` \| `openai`                                                                                         |
-| `--state-dir`    | `{repo}/.graphus`       | Directory where `checksums.json`, `config.json`, and optionally `graphus.db` live                                             |
-| `--benchmark-json` | _(unset)_             | Write phase timings + counts as JSON |
+| Option             | Default                  | Description                                                                        |
+| ------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
+| `--repo`           | `.`                      | Repository root path                                                               |
+| `--source`         | _(required)_             | Java or Kotlin source root (e.g. `src/main/java` or `src/main/kotlin`); repeatable |
+| `--collection`     | _(repo directory name)_  | Logical collection/table name embedded in SQLite + persisted in `config.json`      |
+| `--db`             | persisted or `chroma`    | `chroma` (HTTP server) \| `sqlite` (local JDBC SQLite file — no daemon)            |
+| `--db-url`         | persisted or localhost   | Base URL used when `--db chroma`                                                   |
+| `--db-timeout`     | persisted or `300`       | Seconds for Chroma HTTP client when `--db chroma`                                  |
+| `--db-file`        | `<state-dir>/graphus.db` | SQLite file path used when `--db sqlite`                                           |
+| `--batch-size`     | `500`                    | Symbols per embedding/index batch                                                  |
+| `--embedding`      | persisted or `local`     | Embedding backend: `local` \| `openai`                                             |
+| `--state-dir`      | `{repo}/.graphus`        | Directory where `checksums.json`, `config.json`, and optionally `graphus.db` live  |
+| `--benchmark-json` | _(unset)_                | Write phase timings + counts as JSON                                               |
 
 ### Sync (Incremental Update)
 
@@ -119,18 +124,18 @@ graphus sync \
 
 Accepts the same options as `index`. Exits with an error if no checksum registry is found.
 
-| Option          | Default                 | Description                                                                   |
-| --------------- | ----------------------- | ----------------------------------------------------------------------------- |
-| `--repo`        | `.`                     | Repository root path                                                         |
-| `--source`      | _(required)_            | Java source root; repeatable                                                 |
-| `--collection`  | _(repo directory name)_ | Embedding collection/table name                                               |
-| `--db`          | persisted or `chroma`   | `chroma` \| `sqlite`                                                          |
-| `--db-url`      | persisted or localhost  | Chroma base URL (chroma backend)                                               |
-| `--db-timeout`  | persisted or `300`      | Chroma HTTP timeout seconds                                                    |
-| `--db-file`     | persisted or `<state>/graphus.db` | SQLite file when using sqlite                                                 |
-| `--batch-size`  | `500`                   | Symbols per embedding/index batch                                              |
-| `--embedding`   | persisted or `local`    | `local` \| `openai`                                                            |
-| `--state-dir`   | `{repo}/.graphus`       | `checksums.json` / `config.json` directory                                     |
+| Option         | Default                           | Description                                                                        |
+| -------------- | --------------------------------- | ---------------------------------------------------------------------------------- |
+| `--repo`       | `.`                               | Repository root path                                                               |
+| `--source`     | _(required)_                      | Java or Kotlin source root (e.g. `src/main/java` or `src/main/kotlin`); repeatable |
+| `--collection` | _(repo directory name)_           | Embedding collection/table name                                                    |
+| `--db`         | persisted or `chroma`             | `chroma` \| `sqlite`                                                               |
+| `--db-url`     | persisted or localhost            | Chroma base URL (chroma backend)                                                   |
+| `--db-timeout` | persisted or `300`                | Chroma HTTP timeout seconds                                                        |
+| `--db-file`    | persisted or `<state>/graphus.db` | SQLite file when using sqlite                                                      |
+| `--batch-size` | `500`                             | Symbols per embedding/index batch                                                  |
+| `--embedding`  | persisted or `local`              | `local` \| `openai`                                                                |
+| `--state-dir`  | `{repo}/.graphus`                 | `checksums.json` / `config.json` directory                                         |
 
 ### Homebrew release automation
 
@@ -157,13 +162,13 @@ graphus query \
 
 Graphus merges CLI flags → `.graphus/config.json` (under `--state-dir`, default `./.graphus`) → safe defaults (`chroma` @ `localhost:8000`).
 
-| Option          | Default                            | Description                                |
-| --------------- | ---------------------------------- | ------------------------------------------ |
-| `--collection`  | persisted or current dir name       | Embedding collection/table                 |
-| `--state-dir`   | `./.graphus`                         | Holds `config.json` + SQLite default       |
-| `--db` \| `--db-url` \| `--db-timeout` \| `--db-file` | (same merge rules as `index`) | Override persisted vector backend tuning   |
-| `--embedding`   | persisted or `local`               | Embedding backend                          |
-| `--top-k`       | `10`                               | Max hits                                   |
+| Option                                                | Default                       | Description                              |
+| ----------------------------------------------------- | ----------------------------- | ---------------------------------------- |
+| `--collection`                                        | persisted or current dir name | Embedding collection/table               |
+| `--state-dir`                                         | `./.graphus`                  | Holds `config.json` + SQLite default     |
+| `--db` \| `--db-url` \| `--db-timeout` \| `--db-file` | (same merge rules as `index`) | Override persisted vector backend tuning |
+| `--embedding`                                         | persisted or `local`          | Embedding backend                        |
+| `--top-k`                                             | `10`                          | Max hits                                 |
 
 ### Blast Radius (Callers)
 
@@ -212,10 +217,10 @@ graphus query "where is user creation logic" --collection my-repo --embedding op
 
 ### Vector store backends (`--db`)
 
-| Backend   | Requirement                         | Highlights                                                                                                   |
-| --------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `chroma`  | Running Chroma v2-compatible API | Remote HTTP embeddings collection (LangChain4j integration).                                                  |
-| `sqlite`  | JDBC SQLite file (`sqlite-jdbc`)   | Fully local; cosine similarity executes in-process. Default file: `{state-dir}/graphus.db` when `--db-file` omitted. |
+| Backend  | Requirement                      | Highlights                                                                                                           |
+| -------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `chroma` | Running Chroma v2-compatible API | Remote HTTP embeddings collection (LangChain4j integration).                                                         |
+| `sqlite` | JDBC SQLite file (`sqlite-jdbc`) | Fully local; cosine similarity executes in-process. Default file: `{state-dir}/graphus.db` when `--db-file` omitted. |
 
 `graphus index` / successful `sync` runs write **`{state-dir}/config.json`** with the resolved `{db,dbUrl,dbTimeoutSeconds?,dbFile?,embedding,collection}` so agents or Homebrew installs can rerun `sync`/`query` without repeating flags unless you intentionally override.
 
@@ -226,3 +231,4 @@ Precedence whenever a flag is **omitted** on the CLI: **`config.json` → defaul
 - Spring runtime dispatch (AOP/proxies) cannot be fully represented by static call edges.
 - External symbols may be unresolved when full classpath/JAR context is unavailable.
 - Annotation element access such as `ann.value()` is parsed reliably, but not always resolvable via method resolution.
+- Kotlin call edges (Kotlin → Kotlin and cross-language Java ↔ Kotlin) are **best-effort**: they are matched by callee name and arity rather than full type resolution. Overloads with the same name/arity may be left as unresolved or, on cross-language passes, picked deterministically only when a single candidate exists. Kotlin extension functions, lambdas, infix calls, and operator overloads are not yet modeled as first-class call edges.

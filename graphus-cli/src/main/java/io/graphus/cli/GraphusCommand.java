@@ -67,7 +67,10 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--repo", defaultValue = ".", description = "Repository root path")
         private Path repositoryRoot;
 
-        @Option(names = "--source", description = "Java source root; can be passed multiple times")
+        @Option(
+                names = "--source",
+                description =
+                        "Java or Kotlin source root (e.g. src/main/java or src/main/kotlin); can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
         @Option(names = "--collection", description = "Embedding collection/table name (default: top-level directory name of --repo)")
@@ -118,7 +121,7 @@ public final class GraphusCommand implements Callable<Integer> {
                         CliWorkspaceLayouts.collectionName(collectionName, workspace, workspaces.size());
                 Path resolvedStateDir =
                         CliWorkspaceLayouts.stateDirectory(stateDir, workspace, workspaces.size());
-                List<Path> normalizedRoots = workspace.flattenedSourceRoots();
+                List<Path> normalizedRoots = combinedRoots(workspace);
 
                 GraphusVectorRuntime.Resolved runtime =
                         GraphusVectorRuntime.merge(
@@ -227,7 +230,10 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--repo", defaultValue = ".", description = "Repository root path")
         private Path repositoryRoot;
 
-        @Option(names = "--source", description = "Java source root; can be passed multiple times")
+        @Option(
+                names = "--source",
+                description =
+                        "Java or Kotlin source root (e.g. src/main/java or src/main/kotlin); can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
         @Option(names = "--collection", description = "Embedding collection/table name (default: top-level directory name of --repo)")
@@ -270,7 +276,7 @@ public final class GraphusCommand implements Callable<Integer> {
                 Path resolvedStateDir =
                         CliWorkspaceLayouts.stateDirectory(stateDir, workspace, workspaces.size());
 
-                List<Path> normalizedRoots = workspace.flattenedSourceRoots();
+                List<Path> normalizedRoots = combinedRoots(workspace);
 
                 if (!FileChecksumRegistry.exists(resolvedStateDir)) {
                     System.err.println(
@@ -294,7 +300,7 @@ public final class GraphusCommand implements Callable<Integer> {
                 FileChangeSet changes = registry.diffAndUpdate(workspace.root(), normalizedRoots);
                 System.out.println(timing("Scan time       : ", formatElapsed(scanStartNanos)));
 
-                int totalFiles = FileChecksumRegistry.discoverJavaFiles(normalizedRoots).size();
+                int totalFiles = FileChecksumRegistry.discoverSourceFiles(normalizedRoots).size();
                 System.out.println(summary("Files scanned   : ", Integer.toString(totalFiles)));
                 System.out.println(summary("Added           : ", Integer.toString(changes.added().size())));
                 System.out.println(summary("Modified        : ", Integer.toString(changes.modified().size())));
@@ -496,7 +502,10 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--repo", defaultValue = ".", description = "Repository root path")
         private Path repositoryRoot;
 
-        @Option(names = "--source", description = "Java source root; can be passed multiple times")
+        @Option(
+                names = "--source",
+                description =
+                        "Java or Kotlin source root (e.g. src/main/java or src/main/kotlin); can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
         @Option(names = "--depth", defaultValue = "3", description = "Traversal depth")
@@ -552,6 +561,20 @@ public final class GraphusCommand implements Callable<Integer> {
                     .findFirst()
                     .orElse(null);
         }
+    }
+
+    /**
+     * Returns Java + Kotlin source roots flattened across all modules. Used by checksum tracking
+     * and parser invocations so a workspace with mixed languages is enumerated end-to-end.
+     */
+    private static List<Path> combinedRoots(WorkspaceDescriptor workspace) {
+        List<Path> combined = new ArrayList<>(workspace.flattenedSourceRoots());
+        for (Path kotlinRoot : workspace.flattenedKotlinSourceRoots()) {
+            if (!combined.contains(kotlinRoot)) {
+                combined.add(kotlinRoot);
+            }
+        }
+        return combined;
     }
 
     /** Groups repository-relative paths by {@code module} embedding tag assignment. */
