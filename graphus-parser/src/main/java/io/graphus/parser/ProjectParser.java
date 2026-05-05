@@ -8,6 +8,8 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSol
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import io.graphus.model.CallGraph;
+import io.graphus.model.ModuleDescriptor;
+import io.graphus.model.WorkspaceDescriptor;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,6 +60,25 @@ public final class ProjectParser {
         CallGraphBuilder callGraphBuilder = new CallGraphBuilder(repositoryRoot.toAbsolutePath().normalize());
         int unresolvedCalls = callGraphBuilder.buildEdges(callGraph, parserContext.callableIdsByDeclaration());
         return new ProjectParserResult(callGraph, parsedFiles, unresolvedCalls);
+    }
+
+    public ProjectParserResult parse(WorkspaceDescriptor workspace) throws IOException {
+        return parse(workspace, (path, index, total) -> {});
+    }
+
+    public ProjectParserResult parse(WorkspaceDescriptor workspace, ParseProgressListener progressListener)
+            throws IOException {
+        Path repositoryRoot = workspace.root();
+        List<Path> normalizedRoots = new ArrayList<>();
+        for (ModuleDescriptor moduleDescriptor : workspace.modules()) {
+            for (Path sourceRootFromModule : moduleDescriptor.sourceRoots()) {
+                Path absolute = sourceRootFromModule.toAbsolutePath().normalize();
+                if (!normalizedRoots.contains(absolute)) {
+                    normalizedRoots.add(absolute);
+                }
+            }
+        }
+        return parse(repositoryRoot, normalizedRoots, progressListener);
     }
 
     private ParserConfiguration createParserConfiguration(List<Path> sourceRoots) {

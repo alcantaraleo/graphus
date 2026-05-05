@@ -7,15 +7,20 @@ import io.graphus.indexer.FileChangeSet;
 import io.graphus.indexer.FileChecksumRegistry;
 import io.graphus.indexer.GraphIndexer;
 import io.graphus.indexer.GraphSearchHit;
+import io.graphus.indexer.SymbolChunkBuilder;
 import io.graphus.model.CallGraph;
+import io.graphus.model.WorkspaceDescriptor;
 import io.graphus.parser.ProjectParser;
 import io.graphus.parser.ProjectParserResult;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -73,55 +78,77 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
         private String embeddingBackend;
 
-        @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: {repo}/.graphus)")
+        @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: .graphus per workspace)")
         private Path stateDir;
 
         @Override
         public Integer call() throws Exception {
             long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
-            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
-                    ? collectionName
-                    : repoRoot.getFileName().toString();
-            Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
-            List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
+            List<WorkspaceDescriptor> workspaces = CliWorkspaceLayouts.resolve(repoRoot, sourceRoots);
 
-            var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(
-                    chromaUrl,
-                    resolvedCollectionName,
-                    Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
-            );
-            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
+            int totalParsed = 0;
+            int totalUnresolved = 0;
+            int indexedSymbolsAccumulator = 0;
 
-            System.out.println(phase("Clearing existing index..."));
-            long clearStartNanos = System.nanoTime();
-            graphIndexer.removeAll();
-            System.out.println(timing("Clear time      : ", formatElapsed(clearStartNanos)));
+            ProjectParser projectParser = new ProjectParser();
 
-            long parseStartNanos = System.nanoTime();
-            ParserProgressReporter reporter = new ParserProgressReporter();
-            ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
-            reporter.complete();
-            System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
+            for (WorkspaceDescriptor workspace : workspaces) {
+                String resolvedCollection =
+                        CliWorkspaceLayouts.collectionName(collectionName, workspace, workspaces.size());
+                Path resolvedStateDir =
+                        CliWorkspaceLayouts.stateDirectory(stateDir, workspace, workspaces.size());
+                List<Path> normalizedRoots = workspace.flattenedSourceRoots();
 
-            long indexStartNanos = System.nanoTime();
-            IndexProgressReporter indexReporter = new IndexProgressReporter();
-            int indexedSymbols = graphIndexer.index(parseResult.callGraph(), indexReporter);
-            indexReporter.complete();
-            System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
+                var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
+                var embeddingStore = GraphIndexer.chromaStore(
+                        chromaUrl,
+                        resolvedCollection,
+                        Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
+                );
+                GraphIndexer graphIndexer =
+                        new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
-            System.out.println(phase("Saving checksum registry..."));
-            long checksumStartNanos = System.nanoTime();
-            FileChecksumRegistry registry = FileChecksumRegistry.empty();
-            registry.recomputeAll(repoRoot, normalizedSourceRoots);
-            registry.save(resolvedStateDir);
-            System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
+                System.out.println(phase(
+                        "Workspace [" + workspace.name() + "] collection=" + resolvedCollection));
 
-            System.out.println(summary("Parsed files    : ", Integer.toString(parseResult.parsedFiles())));
-            System.out.println(summary("Unresolved calls: ", Integer.toString(parseResult.unresolvedCalls())));
-            System.out.println(summary("Indexed symbols : ", Integer.toString(indexedSymbols)));
-            System.out.println(summary("Registry saved  : ", resolvedStateDir.resolve("checksums.json").toString()));
+                System.out.println(phase("Clearing existing index..."));
+                long clearStartNanos = System.nanoTime();
+                graphIndexer.removeAll();
+                System.out.println(timing("Clear time      : ", formatElapsed(clearStartNanos)));
+
+                long parseStartNanos = System.nanoTime();
+                ParserProgressReporter reporter = new ParserProgressReporter();
+                ProjectParserResult parseResult = projectParser.parse(workspace, reporter);
+                reporter.complete();
+                System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
+
+                long indexStartNanos = System.nanoTime();
+                IndexProgressReporter indexReporter = new IndexProgressReporter();
+                indexedSymbolsAccumulator += graphIndexer.index(parseResult.callGraph(), workspace, indexReporter);
+                indexReporter.complete();
+                System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
+
+                System.out.println(phase("Saving checksum registry..."));
+                long checksumStartNanos = System.nanoTime();
+                FileChecksumRegistry registry = FileChecksumRegistry.empty();
+                registry.recomputeAll(workspace.root(), normalizedRoots);
+                registry.save(resolvedStateDir);
+                System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
+
+                totalParsed += parseResult.parsedFiles();
+                totalUnresolved += parseResult.unresolvedCalls();
+
+                System.out.println(summary(
+                        "Registry saved  : ", resolvedStateDir.resolve("checksums.json").toString()));
+                System.out.println(Ansi.style("---", Ansi.DIM));
+            }
+
+            System.out.println(summary("Parsed files    : ", Integer.toString(totalParsed)));
+            System.out.println(summary("Unresolved calls: ", Integer.toString(totalUnresolved)));
+            System.out.println(summary(
+                    "Indexed symbols : ",
+                    Integer.toString(indexedSymbolsAccumulator)));
             System.out.println(summary("Total time      : ", formatElapsed(totalStartNanos)));
             return 0;
         }
@@ -151,88 +178,129 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
         private String embeddingBackend;
 
-        @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: {repo}/.graphus)")
+        @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: .graphus per workspace)")
         private Path stateDir;
 
         @Override
         public Integer call() throws Exception {
             long totalStartNanos = System.nanoTime();
             Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
-            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
-                    ? collectionName
-                    : repoRoot.getFileName().toString();
-            Path resolvedStateDir = stateDir != null ? stateDir : repoRoot.resolve(".graphus");
-            List<Path> normalizedSourceRoots = ProjectParser.resolveSourceRoots(repoRoot, sourceRoots);
+            List<WorkspaceDescriptor> workspaces = CliWorkspaceLayouts.resolve(repoRoot, sourceRoots);
 
-            if (!FileChecksumRegistry.exists(resolvedStateDir)) {
-                System.err.println(error("No index found. Run 'graphus index' first."));
-                return 1;
+            int indexedSymbolsAccumulator = 0;
+
+            ProjectParser projectParser = new ProjectParser();
+
+            for (WorkspaceDescriptor workspace : workspaces) {
+                String resolvedCollection =
+                        CliWorkspaceLayouts.collectionName(collectionName, workspace, workspaces.size());
+                Path resolvedStateDir =
+                        CliWorkspaceLayouts.stateDirectory(stateDir, workspace, workspaces.size());
+
+                List<Path> normalizedRoots = workspace.flattenedSourceRoots();
+
+                if (!FileChecksumRegistry.exists(resolvedStateDir)) {
+                    System.err.println(
+                            error(
+                                    "No index found for workspace ["
+                                            + workspace.name()
+                                            + "]. Run 'graphus index' first."));
+                    return 1;
+                }
+
+                System.out.println(phase(
+                        "Workspace [" + workspace.name() + "] collection=" + resolvedCollection));
+
+                System.out.println(phase("Loading checksum registry..."));
+                long loadRegistryStartNanos = System.nanoTime();
+                FileChecksumRegistry registry = FileChecksumRegistry.load(resolvedStateDir);
+                System.out.println(timing("Load time       : ", formatElapsed(loadRegistryStartNanos)));
+
+                System.out.println(phase("Scanning source files for changes..."));
+                long scanStartNanos = System.nanoTime();
+                FileChangeSet changes = registry.diffAndUpdate(workspace.root(), normalizedRoots);
+                System.out.println(timing("Scan time       : ", formatElapsed(scanStartNanos)));
+
+                int totalFiles = FileChecksumRegistry.discoverJavaFiles(normalizedRoots).size();
+                System.out.println(summary("Files scanned   : ", Integer.toString(totalFiles)));
+                System.out.println(summary("Added           : ", Integer.toString(changes.added().size())));
+                System.out.println(summary("Modified        : ", Integer.toString(changes.modified().size())));
+                System.out.println(summary("Deleted         : ", Integer.toString(changes.deleted().size())));
+
+                if (!changes.hasChanges()) {
+                    System.out.println(phase("Nothing to sync. Index is up to date."));
+                    System.out.println(Ansi.style("---", Ansi.DIM));
+                    continue;
+                }
+
+                var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
+                var embeddingStore = GraphIndexer.chromaStore(
+                        chromaUrl,
+                        resolvedCollection,
+                        Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
+                );
+                GraphIndexer graphIndexer =
+                        new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
+
+                long removeStartNanos = System.nanoTime();
+                int removedFiles = 0;
+                for (String filePath : changes.modified()) {
+                    graphIndexer.removeByFile(filePath);
+                    removedFiles++;
+                }
+                for (String filePath : changes.deleted()) {
+                    graphIndexer.removeByFile(filePath);
+                    removedFiles++;
+                }
+                System.out.println(summary("Files removed from index: ", Integer.toString(removedFiles)));
+                System.out.println(timing("Remove time     : ", formatElapsed(removeStartNanos)));
+
+                Set<String> toReindex = changes.toReindex();
+                int indexedThisWorkspace = 0;
+                if (!toReindex.isEmpty()) {
+                    long parseStartNanos = System.nanoTime();
+                    ParserProgressReporter reporter = new ParserProgressReporter();
+                    ProjectParserResult parseResult = projectParser.parse(workspace, reporter);
+                    reporter.complete();
+                    System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
+
+                    long indexStartNanos = System.nanoTime();
+                    IndexProgressReporter indexReporter = new IndexProgressReporter();
+                    if (workspace.isMultiModule()) {
+                        Map<String, Set<String>> byModule = filesGroupedByModuleTag(workspace, toReindex);
+                        for (Map.Entry<String, Set<String>> entry : byModule.entrySet()) {
+                            indexedThisWorkspace += graphIndexer.indexForFiles(
+                                    parseResult.callGraph(),
+                                    workspace,
+                                    entry.getValue(),
+                                    indexReporter);
+                        }
+                    } else {
+                        indexedThisWorkspace +=
+                                graphIndexer.indexForFiles(
+                                        parseResult.callGraph(),
+                                        toReindex,
+                                        indexReporter);
+                    }
+                    indexReporter.complete();
+                    System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
+                }
+
+                System.out.println(phase("Saving updated checksum registry..."));
+                long checksumStartNanos = System.nanoTime();
+                registry.save(resolvedStateDir);
+                System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
+
+                indexedSymbolsAccumulator += indexedThisWorkspace;
+
+                System.out.println(
+                        summary("Symbols indexed : ", Integer.toString(indexedThisWorkspace)));
+                System.out.println(Ansi.style("---", Ansi.DIM));
             }
 
-            System.out.println(phase("Loading checksum registry..."));
-            long loadRegistryStartNanos = System.nanoTime();
-            FileChecksumRegistry registry = FileChecksumRegistry.load(resolvedStateDir);
-            System.out.println(timing("Load time       : ", formatElapsed(loadRegistryStartNanos)));
-
-            System.out.println(phase("Scanning source files for changes..."));
-            long scanStartNanos = System.nanoTime();
-            FileChangeSet changes = registry.diffAndUpdate(repoRoot, normalizedSourceRoots);
-            System.out.println(timing("Scan time       : ", formatElapsed(scanStartNanos)));
-
-            int totalFiles = FileChecksumRegistry.discoverJavaFiles(normalizedSourceRoots).size();
-            System.out.println(summary("Files scanned   : ", Integer.toString(totalFiles)));
-            System.out.println(summary("Added           : ", Integer.toString(changes.added().size())));
-            System.out.println(summary("Modified        : ", Integer.toString(changes.modified().size())));
-            System.out.println(summary("Deleted         : ", Integer.toString(changes.deleted().size())));
-
-            if (!changes.hasChanges()) {
-                System.out.println(phase("Nothing to sync. Index is up to date."));
-                return 0;
-            }
-
-            var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(
-                    chromaUrl,
-                    resolvedCollectionName,
-                    Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
-            );
-            GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
-
-            long removeStartNanos = System.nanoTime();
-            int removedFiles = 0;
-            for (String filePath : changes.modified()) {
-                graphIndexer.removeByFile(filePath);
-                removedFiles++;
-            }
-            for (String filePath : changes.deleted()) {
-                graphIndexer.removeByFile(filePath);
-                removedFiles++;
-            }
-            System.out.println(summary("Files removed from index: ", Integer.toString(removedFiles)));
-            System.out.println(timing("Remove time     : ", formatElapsed(removeStartNanos)));
-
-            Set<String> toReindex = changes.toReindex();
-            int indexedSymbols = 0;
-            if (!toReindex.isEmpty()) {
-                long parseStartNanos = System.nanoTime();
-                ParserProgressReporter reporter = new ParserProgressReporter();
-                ProjectParserResult parseResult = new ProjectParser().parse(repoRoot, sourceRoots, reporter);
-                reporter.complete();
-                System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
-
-                long indexStartNanos = System.nanoTime();
-                IndexProgressReporter indexReporter = new IndexProgressReporter();
-                indexedSymbols = graphIndexer.indexForFiles(parseResult.callGraph(), toReindex, indexReporter);
-                indexReporter.complete();
-                System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
-            }
-
-            System.out.println(phase("Saving updated checksum registry..."));
-            long checksumStartNanos = System.nanoTime();
-            registry.save(resolvedStateDir);
-            System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
-
-            System.out.println(summary("Symbols indexed : ", Integer.toString(indexedSymbols)));
+            System.out.println(summary(
+                    "Total symbols indexed across workspaces: ",
+                    Integer.toString(indexedSymbolsAccumulator)));
             System.out.println(summary("Total time      : ", formatElapsed(totalStartNanos)));
             return 0;
         }
@@ -256,6 +324,9 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--top-k", defaultValue = "10", description = "Number of hits")
         private int topK;
 
+        @Option(names = "--module", description = "Restrict hits to embeddings tagged with this module name")
+        private String moduleFilter;
+
         @Override
         public Integer call() {
             String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
@@ -264,10 +335,16 @@ public final class GraphusCommand implements Callable<Integer> {
             var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
             var embeddingStore = GraphIndexer.chromaStore(chromaUrl, resolvedCollectionName);
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore);
-            List<GraphSearchHit> hits = graphIndexer.query(question, topK);
+            String module = moduleFilter == null || moduleFilter.isBlank() ? null : moduleFilter.strip();
+            List<GraphSearchHit> hits = graphIndexer.query(question, module, topK);
 
             if (hits.isEmpty()) {
                 System.out.println(phase("No results."));
+                if (module != null) {
+                    System.err.println(error(
+                            "No results for module='" + module
+                                    + "'. This collection may not have been indexed with module tags."));
+                }
                 return 0;
             }
 
@@ -305,9 +382,21 @@ public final class GraphusCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
+            Path repoRoot = repositoryRoot.toAbsolutePath().normalize();
+            List<WorkspaceDescriptor> workspaces = CliWorkspaceLayouts.resolve(repoRoot, sourceRoots);
+            if (workspaces.size() != 1) {
+                System.err.println(
+                        error(
+                                "Blast radius requires exactly one analysable workspace. Found "
+                                        + workspaces.size()
+                                        + ". Narrow --repo, use --source, or run from inside a single project."));
+                return 1;
+            }
+            WorkspaceDescriptor workspaceContext = workspaces.get(0);
+
             ProjectParser projectParser = new ProjectParser();
             ParserProgressReporter reporter = new ParserProgressReporter();
-            ProjectParserResult parseResult = projectParser.parse(repositoryRoot, sourceRoots, reporter);
+            ProjectParserResult parseResult = projectParser.parse(workspaceContext, reporter);
             reporter.complete();
             CallGraph callGraph = parseResult.callGraph();
 
@@ -341,6 +430,18 @@ public final class GraphusCommand implements Callable<Integer> {
                     .findFirst()
                     .orElse(null);
         }
+    }
+
+    /** Groups repository-relative paths by {@code module} embedding tag assignment. */
+    private static Map<String, Set<String>> filesGroupedByModuleTag(
+            WorkspaceDescriptor workspaceDescriptor, Iterable<String> filePaths) {
+        Map<String, Set<String>> accumulator = new LinkedHashMap<>();
+        for (String filePath : filePaths) {
+            String moduleTag =
+                    SymbolChunkBuilder.resolveModuleMetadataTag(filePath, workspaceDescriptor);
+            accumulator.computeIfAbsent(moduleTag, ignored -> new HashSet<>()).add(filePath);
+        }
+        return accumulator;
     }
 
     private static EmbeddingBackend parseEmbeddingBackend(String value) {

@@ -5,19 +5,31 @@ import io.graphus.model.CallGraph;
 import io.graphus.model.ClassNode;
 import io.graphus.model.FieldNode;
 import io.graphus.model.MethodNode;
+import io.graphus.model.ModuleDescriptor;
 import io.graphus.model.SymbolKind;
 import io.graphus.model.SymbolNode;
 import io.graphus.model.UnresolvedNode;
+import io.graphus.model.WorkspaceDescriptor;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class SymbolChunkBuilder {
 
     public List<SymbolChunk> build(CallGraph callGraph) {
-        return buildChunks(callGraph.getNodes(), callGraph);
+        return buildChunks(callGraph.getNodes(), callGraph, Optional.empty());
+    }
+
+    public List<SymbolChunk> build(CallGraph callGraph, WorkspaceDescriptor workspace) {
+        if (!workspace.isMultiModule()) {
+            return build(callGraph);
+        }
+        return buildChunks(callGraph.getNodes(), callGraph, Optional.of(workspace));
     }
 
     public List<SymbolChunk> build(CallGraph callGraph, Set<String> filePaths) {
@@ -25,15 +37,30 @@ public final class SymbolChunkBuilder {
                 callGraph.getNodes().stream()
                         .filter(node -> filePaths.contains(node.getFilePath()))
                         .toList(),
-                callGraph
+                callGraph,
+                Optional.empty()
         );
     }
 
-    private List<SymbolChunk> buildChunks(Collection<SymbolNode> nodes, CallGraph callGraph) {
+    public List<SymbolChunk> build(CallGraph callGraph, WorkspaceDescriptor workspace, Set<String> filePaths) {
+        if (!workspace.isMultiModule()) {
+            return build(callGraph, filePaths);
+        }
+        return buildChunks(
+                callGraph.getNodes().stream()
+                        .filter(node -> filePaths.contains(node.getFilePath()))
+                        .toList(),
+                callGraph,
+                Optional.of(workspace)
+        );
+    }
+
+    private List<SymbolChunk> buildChunks(Collection<SymbolNode> nodes, CallGraph callGraph,
+            Optional<WorkspaceDescriptor> workspace) {
         List<SymbolChunk> chunks = new ArrayList<>();
 
         for (SymbolNode node : nodes) {
-            Metadata metadata = metadataFor(node);
+            Metadata metadata = metadataFor(node, workspace);
             String text = chunkText(node, callGraph);
             chunks.add(new SymbolChunk(node.getId(), text, metadata));
         }
@@ -41,7 +68,16 @@ public final class SymbolChunkBuilder {
         return chunks;
     }
 
-    private Metadata metadataFor(SymbolNode node) {
+    private Metadata metadataFor(SymbolNode node, Optional<WorkspaceDescriptor> workspace) {
+        Metadata metadata = baseMetadataFor(node);
+        if (workspace.isPresent()) {
+            String moduleTag = resolveModuleMetadataTag(node.getFilePath(), workspace.get());
+            metadata = metadata.put("module", moduleTag);
+        }
+        return metadata;
+    }
+
+    private Metadata baseMetadataFor(SymbolNode node) {
         Metadata metadata = new Metadata()
                 .put("fqn", node.getId())
                 .put("kind", node.getKind().name())
@@ -124,5 +160,37 @@ public final class SymbolChunkBuilder {
                     + "File: " + unresolvedNode.getFilePath() + ":" + unresolvedNode.getLine();
         }
         return "[SYMBOL] " + node.getId();
+    }
+
+    /**
+     * Resolves repository-relative {@linkplain SymbolNode#getFilePath()} to a {@linkplain ModuleDescriptor#name()},
+     * using the longest matching workspace-relative source-root prefix across all modules.
+     */
+    public static String resolveModuleMetadataTag(String filePath, WorkspaceDescriptor workspace) {
+        if (filePath == null || filePath.isBlank()) {
+            return "unknown";
+        }
+        Path normalizedFile = Paths.get(filePath.trim()).normalize();
+        Path workspaceRootAbs = workspace.root().toAbsolutePath().normalize();
+
+        Path bestMatchingPrefix = null;
+        String owningModuleName = null;
+
+        for (ModuleDescriptor moduleDescriptor : workspace.modules()) {
+            for (Path absoluteSourceRoot : moduleDescriptor.sourceRoots()) {
+                Path relativeRoot = workspaceRootAbs.relativize(absoluteSourceRoot).normalize();
+                if (!normalizedFile.startsWith(relativeRoot)) {
+                    continue;
+                }
+                boolean better = bestMatchingPrefix == null
+                        || relativeRoot.getNameCount() > bestMatchingPrefix.getNameCount();
+
+                if (better) {
+                    bestMatchingPrefix = relativeRoot;
+                    owningModuleName = moduleDescriptor.name();
+                }
+            }
+        }
+        return owningModuleName != null ? owningModuleName : "unknown";
     }
 }
