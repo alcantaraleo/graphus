@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/alcantaraleo/graphus/compare/v0.5.0...v0.5.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **build:** migrate shadow plugin for Gradle 9 compatibility ([3d0572c](https://github.com/alcantaraleo/graphus/commit/3d0572cb7ebcc1ca68bac10683f43f2684d85162))
+* **deps:** resolve vulnerability overrides and centralize cursor config ([a84ede4](https://github.com/alcantaraleo/graphus/commit/a84ede49c8c42443a55dff3145318496aad32691))
+* **deps:** resolve vulnerability overrides and centralize cursor config ([e580d76](https://github.com/alcantaraleo/graphus/commit/e580d76cc822bad9a3ffc04b728678d949f29151))
+* **workflow:** harden dependabot auto-close signal ([36255bd](https://github.com/alcantaraleo/graphus/commit/36255bd28963bcf52d72a36d4e294c9beb64c241))
+* **workflow:** harden dependabot auto-close signal ([a4858fa](https://github.com/alcantaraleo/graphus/commit/a4858fa759a7442faca2de85b16e27b1ea654a49))
+
 ## [0.5.0](https://github.com/alcantaraleo/graphus/compare/v0.4.0...v0.5.0) (2026-05-01)
 
 
