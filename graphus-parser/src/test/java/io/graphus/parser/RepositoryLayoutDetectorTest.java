@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RepositoryLayoutDetectorTest {
@@ -110,5 +111,70 @@ class RepositoryLayoutDetectorTest {
                         .findFirst()
                         .orElseThrow();
         assertTrue(wsB.isMultiModule());
+    }
+
+    @Test
+    void singleModuleKotlinOnlyAtRootProducesKotlinDescriptor(@TempDir Path tempDir) throws Exception {
+        Path app = tempDir.resolve("complete-kotlin");
+        Files.createDirectories(app.resolve("src/main/kotlin"));
+        Files.writeString(app.resolve("settings.gradle.kts"), "rootProject.name = \"complete-kotlin\"\n");
+
+        List<WorkspaceDescriptor> workspaces = RepositoryLayoutDetector.detect(app);
+        assertEquals(1, workspaces.size());
+        WorkspaceDescriptor workspace = workspaces.get(0);
+        assertFalse(workspace.isMultiModule());
+        ModuleDescriptor module = workspace.modules().get(0);
+        assertTrue(module.sourceRoots().isEmpty(),
+                "Kotlin-only module must not synthesise a non-existent src/main/java entry");
+        assertEquals(
+                app.resolve("src/main/kotlin").toAbsolutePath().normalize(),
+                module.kotlinSourceRoots().get(0));
+    }
+
+    @Test
+    void mixedGradleModulesIncludeJavaAndKotlinRoots(@TempDir Path tempDir) throws Exception {
+        Path root = tempDir.resolve("mixed");
+        Files.createDirectories(root);
+        Files.writeString(root.resolve("settings.gradle.kts"), "include(\"javaMod\", \"kotlinMod\")\n");
+
+        Files.createDirectories(root.resolve("javaMod/src/main/java"));
+        Files.createDirectories(root.resolve("kotlinMod/src/main/kotlin"));
+
+        WorkspaceDescriptor workspace = RepositoryLayoutDetector.detect(root).get(0);
+        assertTrue(workspace.isMultiModule());
+        Map<String, ModuleDescriptor> byName = workspace.modules().stream()
+                .collect(Collectors.toMap(ModuleDescriptor::name, Function.identity()));
+
+        ModuleDescriptor javaMod = byName.get("javaMod");
+        assertNotNull(javaMod);
+        assertEquals(
+                root.resolve("javaMod/src/main/java").toAbsolutePath().normalize(),
+                javaMod.sourceRoots().get(0));
+        assertTrue(javaMod.kotlinSourceRoots().isEmpty());
+
+        ModuleDescriptor kotlinMod = byName.get("kotlinMod");
+        assertNotNull(kotlinMod);
+        assertTrue(kotlinMod.sourceRoots().isEmpty());
+        assertEquals(
+                root.resolve("kotlinMod/src/main/kotlin").toAbsolutePath().normalize(),
+                kotlinMod.kotlinSourceRoots().get(0));
+    }
+
+    @Test
+    void scanModuleDirectoriesDiscoversKotlinOnlyChildren(@TempDir Path tempDir) throws Exception {
+        Path root = tempDir.resolve("autoscan");
+        Files.createDirectories(root);
+        // settings file with no include() — forces scanModuleDirectories to walk children.
+        Files.writeString(root.resolve("settings.gradle.kts"), "rootProject.name = \"autoscan\"\n");
+
+        Files.createDirectories(root.resolve("alpha/src/main/java"));
+        Files.createDirectories(root.resolve("beta/src/main/kotlin"));
+
+        WorkspaceDescriptor workspace = RepositoryLayoutDetector.detect(root).get(0);
+        Map<String, ModuleDescriptor> byName = workspace.modules().stream()
+                .collect(Collectors.toMap(ModuleDescriptor::name, Function.identity()));
+
+        assertNotNull(byName.get("alpha"), "Java-only module must be discovered");
+        assertNotNull(byName.get("beta"), "Kotlin-only module must be discovered");
     }
 }

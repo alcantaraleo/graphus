@@ -49,12 +49,12 @@ public final class FileChecksumRegistry {
     }
 
     /**
-     * Recomputes SHA-256 checksums for all Java files under the given source roots and
+     * Recomputes SHA-256 checksums for all Java and Kotlin source files under the given roots and
      * replaces the internal state entirely. Use this after a full {@code index} run.
      */
     public void recomputeAll(Path repositoryRoot, List<Path> normalizedSourceRoots) throws IOException {
         checksums.clear();
-        for (Path file : discoverJavaFiles(normalizedSourceRoots)) {
+        for (Path file : discoverSourceFiles(normalizedSourceRoots)) {
             String relativePath = relativize(repositoryRoot, file);
             checksums.put(relativePath, computeChecksum(file));
         }
@@ -67,7 +67,7 @@ public final class FileChecksumRegistry {
      */
     public FileChangeSet diffAndUpdate(Path repositoryRoot, List<Path> normalizedSourceRoots) throws IOException {
         Map<String, String> current = new HashMap<>();
-        for (Path file : discoverJavaFiles(normalizedSourceRoots)) {
+        for (Path file : discoverSourceFiles(normalizedSourceRoots)) {
             String relativePath = relativize(repositoryRoot, file);
             current.put(relativePath, computeChecksum(file));
         }
@@ -110,7 +110,12 @@ public final class FileChecksumRegistry {
         }
     }
 
-    public static List<Path> discoverJavaFiles(List<Path> normalizedSourceRoots) throws IOException {
+    /**
+     * Walks {@code normalizedSourceRoots} and returns every regular {@code .java} or {@code .kt}
+     * file. Both Java and Kotlin source roots are accepted in the same call so callers can pass
+     * a single combined list (Java + Kotlin roots flattened from the workspace).
+     */
+    public static List<Path> discoverSourceFiles(List<Path> normalizedSourceRoots) throws IOException {
         List<Path> result = new ArrayList<>();
         for (Path sourceRoot : normalizedSourceRoots) {
             if (!Files.exists(sourceRoot) || !Files.isDirectory(sourceRoot)) {
@@ -118,11 +123,22 @@ public final class FileChecksumRegistry {
             }
             try (Stream<Path> stream = Files.walk(sourceRoot)) {
                 stream.filter(Files::isRegularFile)
-                        .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".java"))
+                        .filter(FileChecksumRegistry::hasIndexedExtension)
                         .forEach(result::add);
             }
         }
         return result;
+    }
+
+    /** @deprecated Use {@link #discoverSourceFiles(List)} which also enumerates Kotlin sources. */
+    @Deprecated
+    public static List<Path> discoverJavaFiles(List<Path> normalizedSourceRoots) throws IOException {
+        return discoverSourceFiles(normalizedSourceRoots);
+    }
+
+    private static boolean hasIndexedExtension(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".java") || name.endsWith(".kt");
     }
 
     private static String relativize(Path repositoryRoot, Path file) {

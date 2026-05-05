@@ -12,12 +12,20 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Determines how Java sources are laid out under a repository directory.
+ * Determines how Java and/or Kotlin sources are laid out under a repository directory.
+ *
+ * <p>Both {@code src/main/java} and {@code src/main/kotlin} are recognized as first-class
+ * source roots. A module is registered when at least one of them exists; Kotlin-only modules
+ * (e.g. Spring Guides {@code complete-kotlin}) no longer crash the parser.
  */
 public final class RepositoryLayoutDetector {
+
+    private static final String JAVA_ROOT = "src/main/java";
+    private static final String KOTLIN_ROOT = "src/main/kotlin";
 
     private static final Set<String> EXCLUDED_DIRECTORIES = Set.of(
             "build",
@@ -46,28 +54,37 @@ public final class RepositoryLayoutDetector {
             return List.of();
         }
 
-        if (Files.isDirectory(resolvedRoot.resolve("src/main/java"))) {
-            return List.of(createSingle(resolvedRoot));
+        if (hasAnyConventionalSourceRoot(resolvedRoot)) {
+            Optional<WorkspaceDescriptor> single = createSingle(resolvedRoot);
+            if (single.isPresent()) {
+                return List.of(single.get());
+            }
         }
 
         Path settingsKts = resolvedRoot.resolve("settings.gradle.kts");
         Path settingsGroovy = resolvedRoot.resolve("settings.gradle");
         Path settingsFile = Files.exists(settingsKts) ? settingsKts : (Files.exists(settingsGroovy) ? settingsGroovy : null);
         if (settingsFile != null) {
-            return List.of(buildGradleWorkspace(resolvedRoot, settingsFile));
+            List<WorkspaceDescriptor> built = buildGradleWorkspace(resolvedRoot, settingsFile);
+            if (!built.isEmpty()) {
+                return built;
+            }
         }
 
         Path pom = resolvedRoot.resolve("pom.xml");
         if (Files.exists(pom)) {
             List<String> mavenModules = MavenModuleParser.parseModuleNames(pom);
             if (!mavenModules.isEmpty()) {
-                return List.of(buildMavenWorkspace(resolvedRoot, mavenModules));
+                List<WorkspaceDescriptor> mavenWorkspace = buildMavenWorkspace(resolvedRoot, mavenModules);
+                if (!mavenWorkspace.isEmpty()) {
+                    return mavenWorkspace;
+                }
             }
         }
 
         if (depth > 0) {
             System.err.println(
-                    "WARN: skipping path with no recognizable Java workspace layout — " + resolvedRoot);
+                    "WARN: skipping path with no recognizable Java/Kotlin workspace layout — " + resolvedRoot);
             return List.of();
         }
 
@@ -94,14 +111,12 @@ public final class RepositoryLayoutDetector {
         return Collections.unmodifiableList(collected);
     }
 
-    private static WorkspaceDescriptor createSingle(Path root) throws IOException {
+    private static Optional<WorkspaceDescriptor> createSingle(Path root) throws IOException {
         String name = root.getFileName().toString();
-        Path javaRoot = root.resolve("src/main/java").toAbsolutePath().normalize();
-        ModuleDescriptor module = new ModuleDescriptor(name, root, List.of(javaRoot));
-        return new WorkspaceDescriptor(name, root, List.of(module));
+        return moduleFor(name, root).map(module -> new WorkspaceDescriptor(name, root, List.of(module)));
     }
 
-    private static WorkspaceDescriptor buildGradleWorkspace(Path repoRoot, Path settingsFile)
+    private static List<WorkspaceDescriptor> buildGradleWorkspace(Path repoRoot, Path settingsFile)
             throws IOException {
         LinkedHashSet<String> moduleIncludes = new LinkedHashSet<>(GradleSettingsParser.parseModuleNames(settingsFile));
         if (moduleIncludes.isEmpty()) {
@@ -109,21 +124,23 @@ public final class RepositoryLayoutDetector {
         }
         List<ModuleDescriptor> descriptors = descriptorsForRelativePaths(repoRoot, moduleIncludes);
         if (descriptors.isEmpty()) {
-            return createSingle(repoRoot);
+            Optional<WorkspaceDescriptor> single = createSingle(repoRoot);
+            return single.map(List::of).orElseGet(List::of);
         }
         String name = repoRoot.getFileName().toString();
-        return new WorkspaceDescriptor(name, repoRoot, descriptors);
+        return List.of(new WorkspaceDescriptor(name, repoRoot, descriptors));
     }
 
-    private static WorkspaceDescriptor buildMavenWorkspace(Path repoRoot, List<String> modulePaths)
+    private static List<WorkspaceDescriptor> buildMavenWorkspace(Path repoRoot, List<String> modulePaths)
             throws IOException {
         LinkedHashSet<String> uniqueModules = new LinkedHashSet<>(modulePaths);
         List<ModuleDescriptor> descriptors = descriptorsForRelativePaths(repoRoot, uniqueModules);
         if (descriptors.isEmpty()) {
-            return createSingle(repoRoot);
+            Optional<WorkspaceDescriptor> single = createSingle(repoRoot);
+            return single.map(List::of).orElseGet(List::of);
         }
         String name = repoRoot.getFileName().toString();
-        return new WorkspaceDescriptor(name, repoRoot, descriptors);
+        return List.of(new WorkspaceDescriptor(name, repoRoot, descriptors));
     }
 
     private static List<ModuleDescriptor> descriptorsForRelativePaths(Path workspaceRoot,
@@ -141,18 +158,16 @@ public final class RepositoryLayoutDetector {
             if (!moduleRootCandidate.startsWith(workspaceRoot)) {
                 continue;
             }
-            Path javaRootPath = moduleRootCandidate.resolve("src/main/java").toAbsolutePath().normalize();
-
-            descriptors.add(new ModuleDescriptor(
-                    tagNameFromGradlePath(normalizedSegments),
-                    moduleRootCandidate.toAbsolutePath().normalize(),
-                    List.of(javaRootPath))
-            );
+            Optional<ModuleDescriptor> module =
+                    moduleFor(tagNameFromGradlePath(normalizedSegments), moduleRootCandidate);
+            module.ifPresent(descriptors::add);
         }
         return descriptors;
     }
 
-    /** Scans immediate child directories exposing {@code src/main/java}. */
+    /**
+     * Scans immediate child directories exposing either {@code src/main/java} or {@code src/main/kotlin}.
+     */
     private static List<String> scanModuleDirectories(Path workspaceRoot) throws IOException {
         LinkedHashSet<String> discovered = new LinkedHashSet<>();
 
@@ -163,10 +178,7 @@ public final class RepositoryLayoutDetector {
             }
         }
 
-        Comparator<Path> byName =
-                Comparator.comparing(a -> a.getFileName().toString());
-
-        Collections.sort(directChildren, byName);
+        directChildren.sort(Comparator.comparing(a -> a.getFileName().toString()));
 
         for (Path childAbs : directChildren) {
             String leaf = childAbs.getFileName().toString();
@@ -174,8 +186,7 @@ public final class RepositoryLayoutDetector {
                 continue;
             }
 
-            Path javaHere = childAbs.resolve("src/main/java");
-            if (Files.isDirectory(javaHere)) {
+            if (hasAnyConventionalSourceRoot(childAbs)) {
                 Path relativized = workspaceRoot.relativize(childAbs.normalize());
                 String textual = relativized.toString().replace('\\', '/');
                 if (!textual.isBlank()) {
@@ -185,6 +196,37 @@ public final class RepositoryLayoutDetector {
         }
 
         return List.copyOf(discovered);
+    }
+
+    /**
+     * Builds a {@link ModuleDescriptor} for {@code moduleRoot} containing whichever of
+     * {@code src/main/java} and {@code src/main/kotlin} exist. Returns {@link Optional#empty()}
+     * when neither directory exists, so callers can decide whether to fall back.
+     */
+    private static Optional<ModuleDescriptor> moduleFor(String name, Path moduleRoot) {
+        List<Path> javaRoots = new ArrayList<>();
+        Path javaRoot = moduleRoot.resolve(JAVA_ROOT);
+        if (Files.isDirectory(javaRoot)) {
+            javaRoots.add(javaRoot.toAbsolutePath().normalize());
+        }
+        List<Path> kotlinRoots = new ArrayList<>();
+        Path kotlinRoot = moduleRoot.resolve(KOTLIN_ROOT);
+        if (Files.isDirectory(kotlinRoot)) {
+            kotlinRoots.add(kotlinRoot.toAbsolutePath().normalize());
+        }
+        if (javaRoots.isEmpty() && kotlinRoots.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new ModuleDescriptor(
+                name,
+                moduleRoot.toAbsolutePath().normalize(),
+                javaRoots,
+                kotlinRoots));
+    }
+
+    private static boolean hasAnyConventionalSourceRoot(Path moduleRoot) {
+        return Files.isDirectory(moduleRoot.resolve(JAVA_ROOT))
+                || Files.isDirectory(moduleRoot.resolve(KOTLIN_ROOT));
     }
 
     private static String normalizeRelativeSegments(String path) {

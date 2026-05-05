@@ -51,6 +51,26 @@ public final class CallGraph {
         }
     }
 
+    /**
+     * Removes a single edge from {@code fromId} to {@code toId}. Use when a placeholder edge
+     * (typically pointing at an {@link UnresolvedNode}) is being replaced by a resolved edge.
+     */
+    public void removeEdge(String fromId, String toId) {
+        edges.removeIf(edge -> edge.fromId().equals(fromId) && edge.toId().equals(toId));
+    }
+
+    /**
+     * Removes a node and every edge touching it. Useful for {@link UnresolvedNode} placeholders
+     * that a later resolution pass has replaced with a direct call edge.
+     */
+    public void removeNode(String id) {
+        if (id == null || id.isBlank()) {
+            return;
+        }
+        nodes.remove(id);
+        edges.removeIf(edge -> edge.fromId().equals(id) || edge.toId().equals(id));
+    }
+
     public Set<String> incomingNeighbors(String nodeId) {
         Set<String> incoming = new LinkedHashSet<>();
         for (CallEdge edge : edges) {

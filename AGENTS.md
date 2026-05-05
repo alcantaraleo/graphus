@@ -1,6 +1,6 @@
 # Graphus — Agent Guide
 
-Graphus is a Java CLI that parses Java + Spring Boot source code, builds a symbol-aware call graph, and indexes symbol chunks into a vector store (ChromaDB by default or a local SQLite embeddings file) for LLM/RAG retrieval.
+Graphus is a Java CLI that parses Java and Kotlin + Spring Boot source code, builds a symbol-aware call graph (with best-effort cross-language Java ↔ Kotlin edges), and indexes symbol chunks into a vector store (ChromaDB by default or a local SQLite embeddings file) for LLM/RAG retrieval.
 
 ## Delegation policy
 
@@ -11,12 +11,12 @@ Graphus is a Java CLI that parses Java + Spring Boot source code, builds a symbo
 
 ## Modules
 
-| Module            | Role                                                                           |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `graphus-model`   | Domain model — `CallGraph`, `SymbolNode`, `SpringMetadata`                     |
-| `graphus-parser`  | JavaParser AST visitor pipeline → `CallGraph`                                  |
-| `graphus-indexer` | LangChain4j `EmbeddingStore` (Chroma or SQLite), checksum sync + `config.json` |
-| `graphus-cli`     | Picocli entry point — `index`, `sync`, `query`, `blast-radius`, `install`      |
+| Module            | Role                                                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| `graphus-model`   | Language-agnostic domain model — `CallGraph`, `SymbolNode`, `SpringMetadata`, `GuiceMetadata`                  |
+| `graphus-parser`  | Java (JavaParser) + Kotlin (`kotlin-compiler-embeddable` PSI) AST pipeline → `CallGraph` + cross-language pass |
+| `graphus-indexer` | LangChain4j `EmbeddingStore` (Chroma or SQLite), checksum sync over `.java` + `.kt` files, `config.json`       |
+| `graphus-cli`     | Picocli entry point — `index`, `sync`, `query`, `blast-radius`, `install`                                      |
 
 See [Architecture](docs/architecture.md) for full class breakdown and data flow.
 
@@ -58,8 +58,10 @@ Any change to how Graphus is built, packaged, or distributed — including chang
 - Java 21, Gradle Kotlin DSL, no Spring Boot runtime
 - No star imports; constructor injection only; prefer `final`
 - Module deps are strictly layered — no circular dependencies
-- Symbol IDs: `fully.qualified.ClassName.methodName(param.Type)`
-- State dir: `{repo}/.graphus/` stores `checksums.json`, `config.json`, and optional `graphus.db`
+- Symbol IDs: `fully.qualified.ClassName.methodName(param.Type)`; Kotlin top-level functions are emitted under a synthetic `<package>.<File>Kt` facade class to match the JVM bytecode shape
+- Kotlin source roots live next to Java roots in `ModuleDescriptor` (`sourceRoots` for Java, `kotlinSourceRoots` for Kotlin); `RepositoryLayoutDetector` picks up `src/main/kotlin` automatically and `--source` accepts paths to either Java or Kotlin roots
+- Cross-language call edges (Java ↔ Kotlin) are best-effort, resolved by name + arity in `CrossLanguageCallResolver` after both per-language passes
+- State dir: `{repo}/.graphus/` stores `checksums.json` (now covering `.java` + `.kt`), `config.json`, and optional `graphus.db`
 - Vector backend + embedding settings must stay consistent across `index`/`sync`/`query` unless intentionally reconfigured
 
 See [Conventions](docs/conventions.md) for full details.
