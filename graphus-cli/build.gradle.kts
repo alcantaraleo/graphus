@@ -33,6 +33,12 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     mergeServiceFiles()
 }
 
+tasks.named<ProcessResources>("processResources") {
+    filesMatching("io/graphus/cli/version.properties") {
+        expand("version" to project.version)
+    }
+}
+
 tasks.named<JavaExec>("run") {
     // Keep CLI relative paths anchored at the Graphus repository root.
     workingDir = rootProject.projectDir
