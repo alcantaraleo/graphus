@@ -7,12 +7,9 @@ import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.chroma.ChromaApiVersion;
-import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import io.graphus.model.CallGraph;
 import io.graphus.model.WorkspaceDescriptor;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,19 +32,6 @@ public final class GraphIndexer {
         this.embeddingStore = embeddingStore;
         this.symbolChunkBuilder = new SymbolChunkBuilder();
         this.batchSize = Math.max(1, batchSize);
-    }
-
-    public static EmbeddingStore<TextSegment> chromaStore(String chromaUrl, String collectionName) {
-        return chromaStore(chromaUrl, collectionName, Duration.ofSeconds(5));
-    }
-
-    public static EmbeddingStore<TextSegment> chromaStore(String chromaUrl, String collectionName, Duration timeout) {
-        return ChromaEmbeddingStore.builder()
-                .apiVersion(ChromaApiVersion.V2)
-                .baseUrl(chromaUrl)
-                .collectionName(collectionName)
-                .timeout(timeout)
-                .build();
     }
 
     public int index(CallGraph callGraph) {

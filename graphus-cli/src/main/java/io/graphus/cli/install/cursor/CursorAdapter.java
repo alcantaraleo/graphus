@@ -39,26 +39,27 @@ public final class CursorAdapter implements ToolAdapter {
                 ## Repository Defaults
 
                 - Repository path: `%s`
-                - Chroma URL default: `http://localhost:8000`
-                - Embedding default: `local`
+                - `.graphus/config.json` persists the vector backend (`--db chroma|sqlite`), Chroma tuning, optional SQLite `--db-file`, embedding choice, and the resolved `--collection`.
 
                 ## Commands
 
                 ### Full Index
 
                 ```bash
-                graphus index --repo . --source src/main/java --batch-size 500 --chroma-timeout 300
+                graphus index --repo . --source src/main/java --batch-size 500 --db sqlite
                 ```
 
-                Use when there is no previous index or when a full rebuild is requested. `--collection` is optional and defaults to the repository directory name.
+                Add `--db chroma`, `--db-url`, `--db-timeout`, or `--db-file` explicitly when Dockerized Chroma is not on `localhost:8000` or when relocating the SQLite embeddings file.
+
+                Use when there is no previous index or when a full rebuild is requested.
 
                 ### Incremental Sync
 
                 ```bash
-                graphus sync --repo . --source src/main/java --batch-size 500 --chroma-timeout 300
+                graphus sync --repo . --source src/main/java --batch-size 500
                 ```
 
-                Use after code changes to update only added, modified, and deleted files. `--collection` is optional and defaults to the repository directory name.
+                After the first successful `index`, this reads `.graphus/config.json` unless you intentionally override `--db*` on the CLI.
 
                 ### Query
 
@@ -66,7 +67,7 @@ public final class CursorAdapter implements ToolAdapter {
                 graphus query "<question>" --top-k 10
                 ```
 
-                Use for natural language retrieval over indexed symbols. `--collection` is optional and defaults to the current directory name.
+                Uses `.graphus/config.json` (`--state-dir` defaults to `./.graphus`). Pass `--collection` only when you need a different embeddings namespace than recorded in the workspace state.
 
                 ### Blast Radius
 
@@ -80,7 +81,7 @@ public final class CursorAdapter implements ToolAdapter {
 
                 - `--collection` defaults to the repository/current directory name and can be omitted in most cases. Pass it explicitly only when targeting a collection with a different name.
                 - If `.graphus/checksums.json` is missing, run `index` before `sync`.
-                - Keep embedding backend consistent between index/sync/query for the same collection.
+                - Keep embedding + vector backends consistent between `index`/`sync`/`query` unless you intentionally reconfigure them.
                 - Surface key command output to the user instead of dumping raw logs.
                 """.formatted(repoPath);
     }
