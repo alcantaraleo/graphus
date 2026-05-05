@@ -81,6 +81,27 @@ class SqliteEmbeddingStoreTest {
                 SqliteEmbeddingStore.buildPhysicalTableName("My-Repo__Module"));
     }
 
+    @Test
+    void wholeNumberDoubleMetadataCoercesToIntegerNotLong(@TempDir Path tempDir) {
+        Path db = tempDir.resolve("meta-coerce.sqlite");
+        SqliteEmbeddingStore store = new SqliteEmbeddingStore(db, "coerce-test");
+
+        float[] vector = normalizedVector(List.of(1f, 0f, 0f));
+        Metadata lineAsDouble = new Metadata(Map.of("line", 42.0, "big", 3_000_000_000.0));
+        store.addAll(
+                List.of("r1"),
+                List.of(Embedding.from(vector)),
+                List.of(TextSegment.from("s", lineAsDouble)));
+
+        var hits =
+                store.search(
+                        EmbeddingSearchRequest.builder().queryEmbedding(Embedding.from(vector)).maxResults(1).build());
+        Map<String, Object> roundTrip = hits.matches().getFirst().embedded().metadata().toMap();
+
+        assertEquals(Integer.class, roundTrip.get("line").getClass(), "whole doubles in JSON should round-trip as Integer");
+        assertEquals(Long.class, roundTrip.get("big").getClass(), "integral doubles beyond int range stay as Long");
+    }
+
     private static float[] normalizedVector(List<Float> values) {
         double norm = Math.sqrt(values.stream().mapToDouble(f -> (double) f * f).sum());
         float[] out = new float[values.size()];

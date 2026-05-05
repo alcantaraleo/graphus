@@ -396,9 +396,12 @@ public final class SqliteEmbeddingStore implements EmbeddingStore<TextSegment> {
         if (value instanceof Double doubleValue) {
             long rounded = Math.round(doubleValue);
             if (Math.abs(doubleValue - rounded) < 1e-9) {
-                return (int) rounded == rounded ? (int) rounded : rounded;
+                if (rounded >= Integer.MIN_VALUE && rounded <= Integer.MAX_VALUE) {
+                    return Integer.valueOf((int) rounded);
+                }
+                return Long.valueOf(rounded);
             }
-            return doubleValue.floatValue();
+            return Float.valueOf(doubleValue.floatValue());
         }
         return value;
     }
