@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/alcantaraleo/graphus/compare/v0.6.1...v0.7.0) (2026-05-05)
+
+
+### Features
+
+* **parser:** add Kotlin parsing and cross-language call graph ([#51](https://github.com/alcantaraleo/graphus/issues/51)) ([ac89571](https://github.com/alcantaraleo/graphus/commit/ac895718e17dfee7817219be1e84d55a2b08cda2))
+
+
+### Bug Fixes
+
+* **deps:** align plugin classpath for Dependabot graph ([#43](https://github.com/alcantaraleo/graphus/issues/43)) ([4e87189](https://github.com/alcantaraleo/graphus/commit/4e871894e8c495fd12629f684109167a17243b88))
+* **deps:** force patched Shadow transitives via buildscript ([#45](https://github.com/alcantaraleo/graphus/issues/45)) ([e5fc4e6](https://github.com/alcantaraleo/graphus/commit/e5fc4e61dd440ade21f7f4156699d1740b8fd858))
+
 ## [0.6.1](https://github.com/alcantaraleo/graphus/compare/v0.6.0...v0.6.1) (2026-05-05)
 
 
