@@ -19,6 +19,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    implementation(platform("org.apache.logging.log4j:log4j-bom:2.25.4"))
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
