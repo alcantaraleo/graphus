@@ -1,10 +1,38 @@
 import org.gradle.api.publish.maven.tasks.AbstractPublishToMaven
 
+buildscript {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+    configurations.classpath {
+        resolutionStrategy.eachDependency {
+            when {
+                requested.group == "org.apache.logging.log4j" &&
+                    requested.name in listOf("log4j-core", "log4j-api") -> {
+                    useVersion("2.25.4")
+                    because(
+                        "Align Shadow plugin classpath for GitHub dependency graph; CVE-2026-34477, CVE-2026-34478, CVE-2026-34480",
+                    )
+                }
+                requested.group == "org.codehaus.plexus" && requested.name == "plexus-utils" -> {
+                    useVersion("4.0.3")
+                    because("CVE-2025-67030 (patched 4.x line)")
+                }
+            }
+        }
+    }
+    dependencies {
+        classpath("com.gradleup.shadow:shadow-gradle-plugin:9.4.0")
+    }
+}
+
 plugins {
     id("graphus.java-conventions")
     application
-    id("com.gradleup.shadow") version "9.4.0"
 }
+
+apply(plugin = "com.gradleup.shadow")
 
 dependencies {
     implementation(project(":graphus-model"))
