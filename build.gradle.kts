@@ -17,6 +17,16 @@ allprojects {
 }
 
 subprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force(
+                "org.apache.logging.log4j:log4j-core:2.25.4",
+                "commons-io:commons-io:2.14.0",
+                "org.codehaus.plexus:plexus-utils:3.6.1",
+            )
+        }
+    }
+
     pluginManager.withPlugin("maven-publish") {
         extensions.configure<PublishingExtension> {
             repositories {
