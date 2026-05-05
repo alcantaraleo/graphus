@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/alcantaraleo/graphus/compare/v0.6.0...v0.6.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **ci:** use localhost for Chroma in publish benchmark ([482aaf4](https://github.com/alcantaraleo/graphus/commit/482aaf4334f1415ab888a0b59de55e2901e03daa))
+* **ci:** use localhost for Chroma in publish benchmark ([eee6df8](https://github.com/alcantaraleo/graphus/commit/eee6df80ad6030f779d4685f10bd23da0fe1dd66))
+
 ## [0.6.0](https://github.com/alcantaraleo/graphus/compare/v0.5.1...v0.6.0) (2026-05-05)
 
 
