@@ -9,3 +9,6 @@
 
 # OS
 .DS_Store
+
+# Graphus runtime state (checksums.json, config.json, optional graphus.db)
+.graphus/
