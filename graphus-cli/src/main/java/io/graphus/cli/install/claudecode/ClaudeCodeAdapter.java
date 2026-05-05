@@ -86,8 +86,8 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
 
                 Steps:
                 1. Run:
-                   `graphus index --repo . --source src/main/java --batch-size 500 --chroma-timeout 300`
-                   `--collection` is optional and defaults to the repository directory name. Pass it explicitly only when targeting a collection with a different name.
+                   `graphus index --repo . --source src/main/java --batch-size 500 --db sqlite`
+                   Add `--db chroma ...` overrides if you intentionally want Chroma on a non-default host. `--collection` is optional unless you shard collections manually.
                 2. Share parsed files, unresolved calls, and indexed symbols from command output.
                 """;
     }
@@ -103,8 +103,8 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 Steps:
                 1. If `.graphus/checksums.json` does not exist, run `/project:graphus-index` first.
                 2. Run:
-                   `graphus sync --repo . --source src/main/java --batch-size 500 --chroma-timeout 300`
-                   `--collection` is optional and defaults to the repository directory name. Pass it explicitly only when targeting a collection with a different name.
+                   `graphus sync --repo . --source src/main/java --batch-size 500`
+                   Graphus resolves `.graphus/config.json`; only pass `--collection` / `--db*` when diverging from the recorded workspace defaults.
                 3. Share counts for added, modified, deleted, and indexed symbols.
                 """;
     }
@@ -121,7 +121,7 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 1. If `$ARGUMENTS` is empty, ask for the question to search.
                 2. Run:
                    `graphus query "$ARGUMENTS" --top-k 10`
-                   `--collection` is optional and defaults to the current directory name. Pass it explicitly only when targeting a collection with a different name.
+                   `.graphus/config.json` selects the persisted vector backend + embedding defaults; add `--collection` only when querying a workspace that used a manual collection override.
                 3. Summarize the top results and their metadata.
                 """;
     }

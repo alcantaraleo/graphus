@@ -7,7 +7,10 @@ import io.graphus.indexer.FileChangeSet;
 import io.graphus.indexer.FileChecksumRegistry;
 import io.graphus.indexer.GraphIndexer;
 import io.graphus.indexer.GraphSearchHit;
+import io.graphus.indexer.GraphusConfigRegistry;
+import io.graphus.indexer.GraphusVectorRuntime;
 import io.graphus.indexer.SymbolChunkBuilder;
+import io.graphus.indexer.VectorStoreFactory;
 import io.graphus.model.CallGraph;
 import io.graphus.model.WorkspaceDescriptor;
 import io.graphus.parser.ProjectParser;
@@ -54,7 +57,10 @@ public final class GraphusCommand implements Callable<Integer> {
         return 0;
     }
 
-    @Command(name = "index", description = "Full rebuild: clears the Chroma collection, re-parses all source files, and re-indexes all symbols")
+    @Command(
+            name = "index",
+            description =
+                    "Full rebuild: clears the vector index, re-parses all source files, and re-indexes all symbols (default db: chroma)")
     static final class IndexCommand implements Callable<Integer> {
 
         @Option(names = "--repo", defaultValue = ".", description = "Repository root path")
@@ -63,19 +69,25 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--source", description = "Java source root; can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
-        @Option(names = "--collection", description = "Chroma collection name (default: top-level directory name of --repo)")
+        @Option(names = "--collection", description = "Embedding collection/table name (default: top-level directory name of --repo)")
         private String collectionName;
 
-        @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
-        private String chromaUrl;
+        @Option(names = "--db", description = "Vector store backend: chroma|sqlite")
+        private String db;
 
-        @Option(names = "--chroma-timeout", defaultValue = "300", description = "Chroma HTTP timeout in seconds")
-        private int chromaTimeoutSeconds;
+        @Option(names = "--db-url", description = "Chroma base URL (used when db=chroma)")
+        private String dbUrl;
+
+        @Option(names = "--db-timeout", description = "Chroma HTTP timeout in seconds (used when db=chroma)")
+        private Integer dbTimeoutSeconds;
+
+        @Option(names = "--db-file", description = "SQLite database file path (used when db=sqlite; default: <state-dir>/graphus.db)")
+        private String dbFile;
 
         @Option(names = "--batch-size", defaultValue = "500", description = "Number of symbols per embedding/index batch")
         private int batchSize;
 
-        @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
+        @Option(names = "--embedding", description = "Embedding backend: local|openai (default: persisted config or local)")
         private String embeddingBackend;
 
         @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: .graphus per workspace)")
@@ -100,12 +112,19 @@ public final class GraphusCommand implements Callable<Integer> {
                         CliWorkspaceLayouts.stateDirectory(stateDir, workspace, workspaces.size());
                 List<Path> normalizedRoots = workspace.flattenedSourceRoots();
 
-                var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-                var embeddingStore = GraphIndexer.chromaStore(
-                        chromaUrl,
-                        resolvedCollection,
-                        Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
-                );
+                GraphusVectorRuntime.Resolved runtime =
+                        GraphusVectorRuntime.merge(
+                                resolvedStateDir,
+                                resolvedCollection,
+                                db,
+                                dbUrl,
+                                dbTimeoutSeconds,
+                                dbFile,
+                                embeddingBackend);
+
+                var embeddingModel =
+                        new EmbeddingModelFactory().create(parseEmbeddingBackend(runtime.embedding()));
+                var embeddingStore = VectorStoreFactory.create(runtime.backend(), runtime.storeConfig());
                 GraphIndexer graphIndexer =
                         new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
@@ -136,11 +155,16 @@ public final class GraphusCommand implements Callable<Integer> {
                 registry.save(resolvedStateDir);
                 System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
 
+                GraphusConfigRegistry.save(
+                        resolvedStateDir, GraphusVectorRuntime.persistableCopy(resolvedCollection, runtime));
+
                 totalParsed += parseResult.parsedFiles();
                 totalUnresolved += parseResult.unresolvedCalls();
 
                 System.out.println(summary(
                         "Registry saved  : ", resolvedStateDir.resolve("checksums.json").toString()));
+                System.out.println(summary(
+                        "Config saved    : ", resolvedStateDir.resolve("config.json").toString()));
                 System.out.println(Ansi.style("---", Ansi.DIM));
             }
 
@@ -154,7 +178,10 @@ public final class GraphusCommand implements Callable<Integer> {
         }
     }
 
-    @Command(name = "sync", description = "Incremental update: re-indexes only files that were added, modified, or deleted since the last index/sync")
+    @Command(
+            name = "sync",
+            description =
+                    "Incremental update: re-indexes only files that were added, modified, or deleted since the last index/sync")
     static final class SyncCommand implements Callable<Integer> {
 
         @Option(names = "--repo", defaultValue = ".", description = "Repository root path")
@@ -163,19 +190,25 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--source", description = "Java source root; can be passed multiple times")
         private List<Path> sourceRoots = new ArrayList<>();
 
-        @Option(names = "--collection", description = "Chroma collection name (default: top-level directory name of --repo)")
+        @Option(names = "--collection", description = "Embedding collection/table name (default: top-level directory name of --repo)")
         private String collectionName;
 
-        @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
-        private String chromaUrl;
+        @Option(names = "--db", description = "Vector store backend: chroma|sqlite")
+        private String db;
 
-        @Option(names = "--chroma-timeout", defaultValue = "300", description = "Chroma HTTP timeout in seconds")
-        private int chromaTimeoutSeconds;
+        @Option(names = "--db-url", description = "Chroma base URL (used when db=chroma)")
+        private String dbUrl;
+
+        @Option(names = "--db-timeout", description = "Chroma HTTP timeout in seconds (used when db=chroma)")
+        private Integer dbTimeoutSeconds;
+
+        @Option(names = "--db-file", description = "SQLite database file path (used when db=sqlite; default: <state-dir>/graphus.db)")
+        private String dbFile;
 
         @Option(names = "--batch-size", defaultValue = "500", description = "Number of symbols per embedding/index batch")
         private int batchSize;
 
-        @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
+        @Option(names = "--embedding", description = "Embedding backend: local|openai (default: persisted config or local)")
         private String embeddingBackend;
 
         @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: .graphus per workspace)")
@@ -233,12 +266,19 @@ public final class GraphusCommand implements Callable<Integer> {
                     continue;
                 }
 
-                var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-                var embeddingStore = GraphIndexer.chromaStore(
-                        chromaUrl,
-                        resolvedCollection,
-                        Duration.ofSeconds(Math.max(1, chromaTimeoutSeconds))
-                );
+                GraphusVectorRuntime.Resolved runtime =
+                        GraphusVectorRuntime.merge(
+                                resolvedStateDir,
+                                resolvedCollection,
+                                db,
+                                dbUrl,
+                                dbTimeoutSeconds,
+                                dbFile,
+                                embeddingBackend);
+
+                var embeddingModel =
+                        new EmbeddingModelFactory().create(parseEmbeddingBackend(runtime.embedding()));
+                var embeddingStore = VectorStoreFactory.create(runtime.backend(), runtime.storeConfig());
                 GraphIndexer graphIndexer =
                         new GraphIndexer(embeddingModel, embeddingStore, Math.max(1, batchSize));
 
@@ -291,6 +331,9 @@ public final class GraphusCommand implements Callable<Integer> {
                 registry.save(resolvedStateDir);
                 System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
 
+                GraphusConfigRegistry.save(
+                        resolvedStateDir, GraphusVectorRuntime.persistableCopy(resolvedCollection, runtime));
+
                 indexedSymbolsAccumulator += indexedThisWorkspace;
 
                 System.out.println(
@@ -312,13 +355,25 @@ public final class GraphusCommand implements Callable<Integer> {
         @Parameters(paramLabel = "QUESTION", description = "Natural language query")
         private String question;
 
-        @Option(names = "--collection", description = "Chroma collection name (default: current directory name)")
+        @Option(names = "--collection", description = "Embedding collection/table name (default: persisted config or current directory name)")
         private String collectionName;
 
-        @Option(names = "--chroma-url", defaultValue = "http://localhost:8000", description = "Chroma base URL")
-        private String chromaUrl;
+        @Option(names = "--state-dir", description = "Graphus workspace state directory holding config.json (default: ./.graphus)")
+        private Path stateDir;
 
-        @Option(names = "--embedding", defaultValue = "local", description = "Embedding backend: local|openai")
+        @Option(names = "--db", description = "Vector store backend: chroma|sqlite")
+        private String db;
+
+        @Option(names = "--db-url", description = "Chroma base URL (used when db=chroma)")
+        private String dbUrl;
+
+        @Option(names = "--db-timeout", description = "Chroma HTTP timeout in seconds (used when db=chroma)")
+        private Integer dbTimeoutSeconds;
+
+        @Option(names = "--db-file", description = "SQLite database file path (used when db=sqlite)")
+        private String dbFile;
+
+        @Option(names = "--embedding", description = "Embedding backend: local|openai (default: persisted config or local)")
         private String embeddingBackend;
 
         @Option(names = "--top-k", defaultValue = "10", description = "Number of hits")
@@ -328,13 +383,40 @@ public final class GraphusCommand implements Callable<Integer> {
         private String moduleFilter;
 
         @Override
-        public Integer call() {
-            String resolvedCollectionName = (collectionName != null && !collectionName.isBlank())
-                    ? collectionName
-                    : Paths.get("").toAbsolutePath().getFileName().toString();
-            var embeddingModel = new EmbeddingModelFactory().create(parseEmbeddingBackend(embeddingBackend));
-            var embeddingStore = GraphIndexer.chromaStore(chromaUrl, resolvedCollectionName);
+        public Integer call() throws Exception {
+            Path resolvedStateDir =
+                    stateDir == null
+                            ? Paths.get(".graphus").toAbsolutePath().normalize()
+                            : stateDir.toAbsolutePath().normalize();
+
+            String persistedCollection =
+                    GraphusConfigRegistry.exists(resolvedStateDir)
+                            ? GraphusConfigRegistry.load(resolvedStateDir).collection()
+                            : null;
+
+            String cwdName = Paths.get("").toAbsolutePath().normalize().getFileName().toString();
+
+            String collectionEffective =
+                    firstNonBlank(
+                            blankToNull(collectionName),
+                            blankToNull(persistedCollection),
+                            cwdName);
+
+            GraphusVectorRuntime.Resolved runtime =
+                    GraphusVectorRuntime.merge(
+                            resolvedStateDir,
+                            collectionEffective,
+                            db,
+                            dbUrl,
+                            dbTimeoutSeconds,
+                            dbFile,
+                            embeddingBackend);
+
+            var embeddingModel =
+                    new EmbeddingModelFactory().create(parseEmbeddingBackend(runtime.embedding()));
+            var embeddingStore = VectorStoreFactory.create(runtime.backend(), runtime.storeConfig());
             GraphIndexer graphIndexer = new GraphIndexer(embeddingModel, embeddingStore);
+
             String module = moduleFilter == null || moduleFilter.isBlank() ? null : moduleFilter.strip();
             List<GraphSearchHit> hits = graphIndexer.query(question, module, topK);
 
@@ -454,6 +536,24 @@ public final class GraphusCommand implements Callable<Integer> {
                     "Unsupported embedding backend: " + value + ". Use local or openai."
             );
         };
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.strip();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String firstNonBlank(String preferred, String secondary, String fallback) {
+        if (preferred != null && !preferred.isBlank()) {
+            return preferred;
+        }
+        if (secondary != null && !secondary.isBlank()) {
+            return secondary;
+        }
+        return fallback;
     }
 
     private static String formatElapsed(long startNanos) {
