@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -28,3 +28,7 @@ jobs:
 
       - name: Build
         run: ./gradlew build --no-daemon
+
+      - name: Submit dependency graph
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: gradle/actions/dependency-submission@v4
