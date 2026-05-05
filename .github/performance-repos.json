@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "repos": [
+    {
+      "tier": "small",
+      "slug": "spring-guides/gs-rest-service",
+      "ref": "e9efc9dfa0abe8cf8e15cf0e71830b5125322cae",
+      "note": "Pinned commit on main (Spring getting-started sample; single-module)"
+    },
+    {
+      "tier": "medium",
+      "slug": "spring-io/initializr",
+      "ref": "v0.22.0",
+      "note": "Multi-module Initializr codebase"
+    },
+    {
+      "tier": "large",
+      "slug": "spring-projects/spring-boot",
+      "ref": "v3.4.2",
+      "note": "Large Spring Boot repo; shallow clone"
+    }
+  ]
+}

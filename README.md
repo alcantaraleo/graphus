@@ -73,6 +73,10 @@ Run tests only:
 ./gradlew test
 ```
 
+## Performance benchmarks
+
+Timing results for full `graphus index` runs against pinned fixture repos (small / medium / large) ship as **`PERFORMANCE.md`** on each [GitHub Release](https://github.com/alcantaraleo/graphus/releases)—CI generates and uploads it when a release is published. For methodology (tiers, refs, caveats only), see [PERFORMANCE.md](PERFORMANCE.md).
+
 ## CLI Usage
 
 ### Index a Repository (Full Rebuild)
@@ -100,6 +104,7 @@ graphus index \
 | `--batch-size`   | `500`                   | Symbols per embedding/index batch                                                                                            |
 | `--embedding`    | persisted or `local`    | Embedding backend: `local` \| `openai`                                                                                         |
 | `--state-dir`    | `{repo}/.graphus`       | Directory where `checksums.json`, `config.json`, and optionally `graphus.db` live                                             |
+| `--benchmark-json` | _(unset)_             | Write phase timings + counts as JSON |
 
 ### Sync (Incremental Update)
 

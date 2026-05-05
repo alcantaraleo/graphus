@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -93,6 +94,11 @@ public final class GraphusCommand implements Callable<Integer> {
         @Option(names = "--state-dir", description = "Directory where checksums.json is stored (default: .graphus per workspace)")
         private Path stateDir;
 
+        @Option(
+                names = "--benchmark-json",
+                description = "Write structured index phase timings and counts to this file (JSON)")
+        private Path benchmarkJson;
+
         @Override
         public Integer call() throws Exception {
             long totalStartNanos = System.nanoTime();
@@ -102,6 +108,8 @@ public final class GraphusCommand implements Callable<Integer> {
             int totalParsed = 0;
             int totalUnresolved = 0;
             int indexedSymbolsAccumulator = 0;
+            List<IndexBenchmarkReport.WorkspaceEntry> benchmarkWorkspaces =
+                    benchmarkJson != null ? new ArrayList<>() : Collections.emptyList();
 
             ProjectParser projectParser = new ProjectParser();
 
@@ -134,32 +142,51 @@ public final class GraphusCommand implements Callable<Integer> {
                 System.out.println(phase("Clearing existing index..."));
                 long clearStartNanos = System.nanoTime();
                 graphIndexer.removeAll();
-                System.out.println(timing("Clear time      : ", formatElapsed(clearStartNanos)));
+                long clearNanos = nanosSince(clearStartNanos);
+                System.out.println(timing("Clear time      : ", formatDurationNanos(clearNanos)));
 
                 long parseStartNanos = System.nanoTime();
                 ParserProgressReporter reporter = new ParserProgressReporter();
                 ProjectParserResult parseResult = projectParser.parse(workspace, reporter);
                 reporter.complete();
-                System.out.println(timing("Parse time      : ", formatElapsed(parseStartNanos)));
+                long parseNanos = nanosSince(parseStartNanos);
+                System.out.println(timing("Parse time      : ", formatDurationNanos(parseNanos)));
 
                 long indexStartNanos = System.nanoTime();
                 IndexProgressReporter indexReporter = new IndexProgressReporter();
-                indexedSymbolsAccumulator += graphIndexer.index(parseResult.callGraph(), workspace, indexReporter);
+                int indexedThisWorkspace =
+                        graphIndexer.index(parseResult.callGraph(), workspace, indexReporter);
+                indexedSymbolsAccumulator += indexedThisWorkspace;
                 indexReporter.complete();
-                System.out.println(timing("Index time      : ", formatElapsed(indexStartNanos)));
+                long indexNanos = nanosSince(indexStartNanos);
+                System.out.println(timing("Index time      : ", formatDurationNanos(indexNanos)));
 
                 System.out.println(phase("Saving checksum registry..."));
                 long checksumStartNanos = System.nanoTime();
                 FileChecksumRegistry registry = FileChecksumRegistry.empty();
                 registry.recomputeAll(workspace.root(), normalizedRoots);
                 registry.save(resolvedStateDir);
-                System.out.println(timing("Checksum time   : ", formatElapsed(checksumStartNanos)));
+                long checksumNanos = nanosSince(checksumStartNanos);
+                System.out.println(timing("Checksum time   : ", formatDurationNanos(checksumNanos)));
 
                 GraphusConfigRegistry.save(
                         resolvedStateDir, GraphusVectorRuntime.persistableCopy(resolvedCollection, runtime));
 
                 totalParsed += parseResult.parsedFiles();
                 totalUnresolved += parseResult.unresolvedCalls();
+
+                if (benchmarkJson != null) {
+                    benchmarkWorkspaces.add(new IndexBenchmarkReport.WorkspaceEntry(
+                            workspace.name(),
+                            resolvedCollection,
+                            clearNanos,
+                            parseNanos,
+                            indexNanos,
+                            checksumNanos,
+                            parseResult.parsedFiles(),
+                            parseResult.unresolvedCalls(),
+                            indexedThisWorkspace));
+                }
 
                 System.out.println(summary(
                         "Registry saved  : ", resolvedStateDir.resolve("checksums.json").toString()));
@@ -174,6 +201,19 @@ public final class GraphusCommand implements Callable<Integer> {
                     "Indexed symbols : ",
                     Integer.toString(indexedSymbolsAccumulator)));
             System.out.println(summary("Total time      : ", formatElapsed(totalStartNanos)));
+
+            if (benchmarkJson != null) {
+                IndexBenchmarkReport.write(
+                        benchmarkJson.toAbsolutePath().normalize(),
+                        new IndexBenchmarkReport.Payload(
+                                1,
+                                "index",
+                                nanosSince(totalStartNanos),
+                                totalParsed,
+                                totalUnresolved,
+                                indexedSymbolsAccumulator,
+                                benchmarkWorkspaces));
+            }
             return 0;
         }
     }
@@ -556,8 +596,16 @@ public final class GraphusCommand implements Callable<Integer> {
         return fallback;
     }
 
+    private static long nanosSince(long startNanos) {
+        return System.nanoTime() - startNanos;
+    }
+
+    private static String formatDurationNanos(long nanos) {
+        return formatDuration(Duration.ofNanos(Math.max(0L, nanos)));
+    }
+
     private static String formatElapsed(long startNanos) {
-        return formatDuration(Duration.ofNanos(System.nanoTime() - startNanos));
+        return formatDurationNanos(nanosSince(startNanos));
     }
 
     private static String phase(String value) {
