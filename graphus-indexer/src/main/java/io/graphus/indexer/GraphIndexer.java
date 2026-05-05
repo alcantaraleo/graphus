@@ -11,6 +11,7 @@ import dev.langchain4j.store.embedding.chroma.ChromaApiVersion;
 import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import io.graphus.model.CallGraph;
+import io.graphus.model.WorkspaceDescriptor;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,20 @@ public final class GraphIndexer {
         return indexChunks(chunks, progressListener);
     }
 
+    public int index(CallGraph callGraph, WorkspaceDescriptor workspaceDescriptor) {
+        return index(callGraph, workspaceDescriptor, (chunk, current, total) -> {});
+    }
+
+    public int index(
+            CallGraph callGraph,
+            WorkspaceDescriptor workspaceDescriptor,
+            IndexProgressListener progressListener) {
+        List<SymbolChunk> chunks = workspaceDescriptor.isMultiModule()
+                ? symbolChunkBuilder.build(callGraph, workspaceDescriptor)
+                : symbolChunkBuilder.build(callGraph);
+        return indexChunks(chunks, progressListener);
+    }
+
     /**
      * Removes all documents from the embedding store. Use before a full re-index.
      */
@@ -74,6 +89,16 @@ public final class GraphIndexer {
     }
 
     /**
+     * Removes embeddings whose {@code module} metadata field matches exactly.
+     */
+    public void removeByModule(String moduleName) {
+        if (moduleName == null || moduleName.isBlank()) {
+            return;
+        }
+        embeddingStore.removeAll(new IsEqualTo("module", moduleName));
+    }
+
+    /**
      * Indexes only the symbols belonging to the given set of relative file paths.
      * Useful for incremental sync where only changed files need re-embedding.
      */
@@ -83,6 +108,17 @@ public final class GraphIndexer {
 
     public int indexForFiles(CallGraph callGraph, Set<String> filePaths, IndexProgressListener progressListener) {
         List<SymbolChunk> filteredChunks = symbolChunkBuilder.build(callGraph, filePaths);
+        return indexChunks(filteredChunks, progressListener);
+    }
+
+    public int indexForFiles(
+            CallGraph callGraph,
+            WorkspaceDescriptor workspaceDescriptor,
+            Set<String> filePaths,
+            IndexProgressListener progressListener) {
+        List<SymbolChunk> filteredChunks = workspaceDescriptor.isMultiModule()
+                ? symbolChunkBuilder.build(callGraph, workspaceDescriptor, filePaths)
+                : symbolChunkBuilder.build(callGraph, filePaths);
         return indexChunks(filteredChunks, progressListener);
     }
 
@@ -103,12 +139,21 @@ public final class GraphIndexer {
     }
 
     public List<GraphSearchHit> query(String question, int topK) {
+        return query(question, null, topK);
+    }
+
+    public List<GraphSearchHit> query(String question, String moduleFilter, int topK) {
         Embedding queryEmbedding = embeddingModel.embed(question).content();
-        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
-                .queryEmbedding(queryEmbedding)
-                .maxResults(Math.max(1, topK))
-                .build();
-        EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
+
+        EmbeddingSearchRequest.EmbeddingSearchRequestBuilder requestBuilder =
+                EmbeddingSearchRequest.builder()
+                        .queryEmbedding(queryEmbedding)
+                        .maxResults(Math.max(1, topK));
+        if (moduleFilter != null && !moduleFilter.isBlank()) {
+            requestBuilder = requestBuilder.filter(new IsEqualTo("module", moduleFilter));
+        }
+
+        EmbeddingSearchResult<TextSegment> result = embeddingStore.search(requestBuilder.build());
         return result.matches().stream()
                 .map(this::toSearchHit)
                 .toList();
