@@ -23,7 +23,7 @@ subprojects {
                 add("implementation", "org.apache.logging.log4j:log4j-core:2.25.4") {
                     because("Addresses CVE-2025-68161, CVE-2026-34477, and CVE-2026-34480")
                 }
-                add("implementation", "commons-io:commons-io:2.14.0") {
+                add("implementation", "commons-io:commons-io:2.22.0") {
                     because("Addresses CVE-2024-47554")
                 }
                 add("implementation", "org.codehaus.plexus:plexus-utils:3.6.1") {
