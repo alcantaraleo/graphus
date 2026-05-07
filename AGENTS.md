@@ -65,3 +65,12 @@ Any change to how Graphus is built, packaged, or distributed — including chang
 - Vector backend + embedding settings must stay consistent across `index`/`sync`/`query` unless intentionally reconfigured
 
 See [Conventions](docs/conventions.md) for full details.
+
+## Cursor Cloud specific instructions
+
+- **Java 21** is pre-installed on the VM (`/usr/bin/java`). No version manager setup needed.
+- **Build & test**: `./gradlew build` compiles all four modules and runs JUnit 5 tests. The shadow JAR lands at `graphus-cli/build/libs/graphus.jar`.
+- **No dedicated lint task** — the project has no checkstyle/spotless/PMD plugins; compilation + tests are the quality gate.
+- **Running the CLI locally**: `java -jar graphus-cli/build/libs/graphus.jar <command> [options]`. Use `--db sqlite --embedding local` for a fully offline run (no Docker/ChromaDB/OpenAI needed).
+- **ChromaDB is optional** — only required for `--db chroma`. If needed, `docker compose up -d` starts it on port 8000, but Docker must be installed first (not pre-installed on the VM).
+- **`.graphus/` directory** is generated state (checksums, config, SQLite DB) — always clean it up after demo runs and never commit it.
