@@ -20,7 +20,7 @@ subprojects {
     pluginManager.withPlugin("java") {
         dependencies {
             constraints {
-                add("implementation", "org.apache.logging.log4j:log4j-core:2.25.4") {
+                add("implementation", "org.apache.logging.log4j:log4j-core:2.26.0") {
                     because(
                         "Addresses CVE-2025-68161, CVE-2026-34477, CVE-2026-34478, and CVE-2026-34480",
                     )
