@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":graphus-model"))
-    implementation("com.github.javaparser:javaparser-symbol-solver-core:3.27.1")
+    implementation("com.github.javaparser:javaparser-symbol-solver-core:3.28.1")
     // Kotlin PSI for structural parsing of *.kt files (KtFile, KtClass, KtNamedFunction,
     // KtCallExpression, KtAnnotationEntry). Pinned during the P0 spike: kotlinx-ast was
     // rejected because (a) it is JitPack-only and (b) its KlassDeclaration model does not
