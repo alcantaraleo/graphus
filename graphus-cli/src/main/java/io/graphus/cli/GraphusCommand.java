@@ -1,6 +1,10 @@
 package io.graphus.cli;
 
 import io.graphus.cli.install.InstallCommand;
+import io.graphus.cli.GitAnalyzeCommand;
+import io.graphus.cli.HotspotsCommand;
+import io.graphus.cli.SnapshotCommand;
+import io.graphus.cli.DriftCommand;
 import io.graphus.indexer.EmbeddingBackend;
 import io.graphus.indexer.EmbeddingModelFactory;
 import io.graphus.indexer.FileChangeSet;
@@ -41,7 +45,11 @@ import picocli.CommandLine.Parameters;
                 GraphusCommand.SyncCommand.class,
                 GraphusCommand.QueryCommand.class,
                 GraphusCommand.BlastRadiusCommand.class,
-                InstallCommand.class
+                InstallCommand.class,
+                GitAnalyzeCommand.class,
+                HotspotsCommand.class,
+                SnapshotCommand.class,
+                DriftCommand.class
         },
         description = "Java/Spring code graph + RAG CLI"
 )
