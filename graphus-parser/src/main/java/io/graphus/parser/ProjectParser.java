@@ -145,6 +145,9 @@ public final class ProjectParser {
                 javaBuildResult.records(),
                 kotlinUnresolved);
 
+        // ---- Guice injection resolution ----
+        new GuiceInjectionResolver().resolve(callGraph);
+
         int totalUnresolved = javaBuildResult.unresolvedCalls() + kotlinUnresolvedCount - crossResult.total();
         return new ProjectParserResult(callGraph, parsedFiles, Math.max(0, totalUnresolved));
     }
