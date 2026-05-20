@@ -123,6 +123,14 @@ public final class MethodNode extends SymbolNode {
         }
     }
 
+    public void removeCallee(String calleeId) {
+        callees.remove(calleeId);
+    }
+
+    public void removeCaller(String callerId) {
+        callers.remove(callerId);
+    }
+
     public SpringMetadata getSpringMetadata() {
         return springMetadata;
     }

@@ -57,6 +57,14 @@ public final class CallGraph {
      */
     public void removeEdge(String fromId, String toId) {
         edges.removeIf(edge -> edge.fromId().equals(fromId) && edge.toId().equals(toId));
+        SymbolNode from = nodes.get(fromId);
+        SymbolNode to = nodes.get(toId);
+        if (from instanceof MethodNode fromMethod) {
+            fromMethod.removeCallee(toId);
+        }
+        if (to instanceof MethodNode toMethod) {
+            toMethod.removeCaller(fromId);
+        }
     }
 
     /**
@@ -68,6 +76,19 @@ public final class CallGraph {
             return;
         }
         nodes.remove(id);
+        for (CallEdge edge : edges) {
+            if (edge.fromId().equals(id)) {
+                SymbolNode to = nodes.get(edge.toId());
+                if (to instanceof MethodNode toMethod) {
+                    toMethod.removeCaller(id);
+                }
+            } else if (edge.toId().equals(id)) {
+                SymbolNode from = nodes.get(edge.fromId());
+                if (from instanceof MethodNode fromMethod) {
+                    fromMethod.removeCallee(id);
+                }
+            }
+        }
         edges.removeIf(edge -> edge.fromId().equals(id) || edge.toId().equals(id));
     }
 
