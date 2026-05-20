@@ -6,6 +6,7 @@ import io.graphus.model.ClassNode;
 import io.graphus.model.FieldNode;
 import io.graphus.model.MethodNode;
 import io.graphus.model.ModuleDescriptor;
+import io.graphus.model.ModuleNode;
 import io.graphus.model.SymbolKind;
 import io.graphus.model.SymbolNode;
 import io.graphus.model.UnresolvedNode;
@@ -61,7 +62,7 @@ public final class SymbolChunkBuilder {
 
         for (SymbolNode node : nodes) {
             Metadata metadata = metadataFor(node, workspace);
-            String text = chunkText(node, callGraph);
+            String text = chunkText(node, callGraph, workspace);
             chunks.add(new SymbolChunk(node.getId(), text, metadata));
         }
 
@@ -81,7 +82,7 @@ public final class SymbolChunkBuilder {
         Metadata metadata = new Metadata()
                 .put("fqn", node.getId())
                 .put("kind", node.getKind().name())
-                .put("file", node.getFilePath())
+                .put("file", node.getFilePath() != null ? node.getFilePath() : "")
                 .put("line", node.getLine());
 
         if (node instanceof ClassNode classNode) {
@@ -109,13 +110,28 @@ public final class SymbolChunkBuilder {
         return metadata;
     }
 
-    private String chunkText(SymbolNode node, CallGraph callGraph) {
+    private String chunkText(SymbolNode node, CallGraph callGraph, Optional<WorkspaceDescriptor> workspace) {
+        if (node instanceof ModuleNode moduleNode) {
+            Set<String> depIds = callGraph.outgoingNeighbors(moduleNode.getId());
+            String deps = depIds.stream()
+                    .filter(id -> id.startsWith(ModuleNode.ID_PREFIX))
+                    .map(id -> id.substring(ModuleNode.ID_PREFIX.length()))
+                    .collect(Collectors.joining(", "));
+            return "[MODULE] " + moduleNode.getModuleName() + "\n"
+                    + "Depends On: " + deps + "\n";
+        }
+        String moduleTag = workspace
+                .map(ws -> resolveModuleMetadataTag(node.getFilePath(), ws))
+                .orElse(null);
+        String moduleLine = moduleTag != null ? "Module: " + moduleTag + "\n" : "";
+
         if (node instanceof MethodNode methodNode) {
             String mappings = methodNode.getSpringMetadata().getHttpMappings().stream()
                     .map(mapping -> mapping.method() + " " + mapping.path())
                     .collect(Collectors.joining(", "));
             String kindLabel = methodNode.getKind() == SymbolKind.CONSTRUCTOR ? "CONSTRUCTOR" : "METHOD";
             return "[" + kindLabel + "] " + methodNode.getId() + "\n"
+                    + moduleLine
                     + "Class: " + methodNode.getDeclaringClassId() + "\n"
                     + "Signature: " + methodNode.getSignature() + "\n"
                     + "Return: " + methodNode.getReturnType() + "\n"
@@ -134,6 +150,7 @@ public final class SymbolChunkBuilder {
         }
         if (node instanceof ClassNode classNode) {
             return "[CLASS] " + classNode.getId() + "\n"
+                    + moduleLine
                     + "Simple Name: " + classNode.getSimpleName() + "\n"
                     + "Annotations: " + String.join(", ", classNode.getAnnotations()) + "\n"
                     + "Superclass: " + classNode.getSuperClass() + "\n"
@@ -147,6 +164,7 @@ public final class SymbolChunkBuilder {
         }
         if (node instanceof FieldNode fieldNode) {
             return "[FIELD] " + fieldNode.getId() + "\n"
+                    + moduleLine
                     + "Class: " + fieldNode.getDeclaringClassId() + "\n"
                     + "Name: " + fieldNode.getName() + "\n"
                     + "Type: " + fieldNode.getType() + "\n"

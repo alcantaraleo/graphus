@@ -59,7 +59,14 @@ public final class ProjectParser {
                 }
             }
         }
-        return parseInternal(repositoryRoot, javaRoots, kotlinRoots, progressListener);
+        ProjectParserResult result = parseInternal(repositoryRoot, javaRoots, kotlinRoots, progressListener);
+
+        // ---- Module dependency graph ----
+        if (workspace.isMultiModule()) {
+            GradleModuleDependencyParser.resolve(result.callGraph(), workspace);
+        }
+
+        return result;
     }
 
     private ProjectParserResult parseInternal(
