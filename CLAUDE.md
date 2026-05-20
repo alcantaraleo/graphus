@@ -94,7 +94,8 @@ See [Conventions](docs/conventions.md) for full details.
 - Keep PRs focused; one logical change per PR.
 - Do not merge a PR with a failing CI check.
 - When a PR is opened, immediately label the corresponding issue `under-review`.
-- When a PR is merged, remove the `under-review` label from the corresponding issue and add `pending-release`.
+- In the PR body, reference the issue with `Related to #<number>` — never use `Closes #<number>` or `Fixes #<number>`, as those auto-close the issue on merge.
+- When a PR is merged, remove the `under-review` label from the corresponding issue and add `pending-release`. Leave the issue open — it auto-closes when the release-please PR merges into `main`.
 
 ### Versioning & Releases
 - Versioning is fully automated by `release-please` — do NOT manually edit `version.txt` or `.github/.release-please-manifest.json`.
