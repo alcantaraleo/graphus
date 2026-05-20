@@ -62,6 +62,39 @@ class CrossLanguageCallResolverTest {
     }
 
     @Test
+    void callerCalleesDoNotRetainStaleUnresolvedIdAfterResolution() {
+        CallGraph graph = new CallGraph();
+        MethodNode caller = method("com.demo.JavaClient.use()", "use", "use()");
+        graph.addNode(caller);
+
+        MethodNode target = method("com.demo.KotlinService.greet(String)", "greet", "greet(String)");
+        graph.addNode(target);
+
+        UnresolvedNode unresolved =
+                new UnresolvedNode("UNRESOLVED:greet(name)", "greet(name)", "Java.java", 7);
+        graph.addNode(unresolved);
+        graph.addEdge(caller.getId(), unresolved.getId());
+
+        UnresolvedCallRecord record =
+                new UnresolvedCallRecord(caller.getId(), "greet", 1, unresolved.getId(),
+                        UnresolvedCallRecord.Origin.JAVA);
+
+        new CrossLanguageCallResolver().resolve(
+                graph,
+                Set.of(caller.getId()),
+                Set.of(target.getId()),
+                List.of(record),
+                List.of());
+
+        assertFalse(caller.getCallees().contains(unresolved.getId()),
+                "Stale unresolved callee must not remain after resolution");
+        assertTrue(caller.getCallees().contains(target.getId()),
+                "Caller must reference resolved callee id");
+        assertTrue(target.getCallers().contains(caller.getId()),
+                "Resolved target must list caller");
+    }
+
+    @Test
     void replacesKotlinUnresolvedWithDirectJavaEdgeOnUniqueMatch() {
         CallGraph graph = new CallGraph();
         MethodNode kotlinCaller = method("com.demo.KotlinClient.run()", "run", "run()");
