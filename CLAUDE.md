@@ -93,6 +93,7 @@ See [Conventions](docs/conventions.md) for full details.
 - Prefer squash merge: the PR title becomes the final commit subject on `main`.
 - Keep PRs focused; one logical change per PR.
 - Do not merge a PR with a failing CI check.
+- When a PR is opened, immediately label the corresponding issue `under-review`.
 
 ### Versioning & Releases
 - Versioning is fully automated by `release-please` — do NOT manually edit `version.txt` or `.github/.release-please-manifest.json`.
