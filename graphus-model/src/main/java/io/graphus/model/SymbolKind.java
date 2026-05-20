@@ -6,5 +6,6 @@ public enum SymbolKind {
     CONSTRUCTOR,
     FIELD,
     ANNOTATION,
-    UNRESOLVED
+    UNRESOLVED,
+    MODULE
 }
