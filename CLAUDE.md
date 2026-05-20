@@ -1,13 +1,13 @@
-# Graphus — Agent Guide
+# Graphus — Claude Code Guide
 
 Graphus is a Java CLI that parses Java and Kotlin + Spring Boot source code, builds a symbol-aware call graph (with best-effort cross-language Java ↔ Kotlin edges), and indexes symbol chunks into a vector store (ChromaDB by default or a local SQLite embeddings file) for LLM/RAG retrieval.
 
 ## Delegation policy
 
-- Prefer robot subagents for validation and execution orchestration.
-- Core sequence: `robot-business-analyst` (when needed) -> `robot-coordinator` -> implementation robot (`robot-java-coder` or `robot-spring-boot-coder`) -> `robot-java-test-writer` -> `robot-java-code-reviewer`.
+- Core sequence: `robot-business-analyst` (when needed) → `robot-coordinator` → implementation robot (`robot-java-coder` or `robot-spring-boot-coder`) → `robot-java-test-writer` → `robot-java-code-reviewer`.
 - Enforce verify gates and dependency order from `*.plan.md` before starting dependent groups.
-- Use supporting skills as needed: `codegraph-exploration`, `sequential-thinking`, `java-code-generation`, and commit/PR skills when delivery tasks are requested.
+- Use supporting agents as needed: `sequential-thinking` for design decisions, `java-code-generation` for targeted one-off implementations, `commit-respecting-agents` for commits, `pr-description-agent` for PRs.
+- For any task touching build, distribution, or install adapters: enforce the Distribution Convention — all three files (adapter, README, CLAUDE.md) must be updated in the same commit.
 
 ## Modules
 
@@ -28,7 +28,7 @@ See [Architecture](docs/architecture.md) for full class breakdown and data flow.
 | `sync`         | Incremental: re-index only added/modified/deleted files                                |
 | `query`        | Natural language retrieval over indexed symbols                                        |
 | `blast-radius` | BFS traversal to find all callers of a symbol                                          |
-| `install`      | Write AI tool integration files (`cursor`, `claude-code`)                              |
+| `install`      | Write AI tool integration files (`claude-code`, `cursor`)                              |
 
 ```bash
 graphus <command> [options]
@@ -40,9 +40,9 @@ See [README](README.md) for full option tables and examples.
 
 Any change to how Graphus is built, packaged, or distributed — including changes to build tasks, release artifact type, wrapper scripts, or command invocation syntax — must update all of the following in the same change:
 
-1. `graphus-cli/src/main/java/io/graphus/cli/install/cursor/CursorAdapter.java` command examples for generated `.cursor/rules/graphus.mdc`
-2. `graphus-cli/src/main/java/io/graphus/cli/install/claudecode/ClaudeCodeAdapter.java` command examples for generated `.claude/commands/graphus-*.md`
-3. `README.md` and this `AGENTS.md` guide so documentation matches real distribution and runtime usage
+1. `graphus-cli/src/main/java/io/graphus/cli/install/claudecode/ClaudeCodeAdapter.java` command examples for generated `.claude/commands/graphus-*.md`
+2. `graphus-cli/src/main/java/io/graphus/cli/install/cursor/CursorAdapter.java` command examples for generated `.cursor/rules/graphus.mdc`
+3. `README.md` and this `CLAUDE.md` guide so documentation matches real distribution and runtime usage
 
 ### Homebrew release flow
 
@@ -66,11 +66,55 @@ Any change to how Graphus is built, packaged, or distributed — including chang
 
 See [Conventions](docs/conventions.md) for full details.
 
-## Cursor Cloud specific instructions
+## Build & Run
 
-- **Java 21** is pre-installed on the VM (`/usr/bin/java`). No version manager setup needed.
+- **Java 21** is required (`/usr/bin/java` or via your version manager).
 - **Build & test**: `./gradlew build` compiles all four modules and runs JUnit 5 tests. The shadow JAR lands at `graphus-cli/build/libs/graphus.jar`.
 - **No dedicated lint task** — the project has no checkstyle/spotless/PMD plugins; compilation + tests are the quality gate.
 - **Running the CLI locally**: `java -jar graphus-cli/build/libs/graphus.jar <command> [options]`. Use `--db sqlite --embedding local` for a fully offline run (no Docker/ChromaDB/OpenAI needed).
-- **ChromaDB is optional** — only required for `--db chroma`. If needed, `docker compose up -d` starts it on port 8000, but Docker must be installed first (not pre-installed on the VM).
+- **ChromaDB is optional** — only required for `--db chroma`. If needed, `docker compose up -d` starts it on port 8000.
 - **`.graphus/` directory** is generated state (checksums, config, SQLite DB) — always clean it up after demo runs and never commit it.
+
+## GitHub Project Rules
+
+### Branching
+- Branch from `main` only.
+- Branch naming: `feature/<issue-number-or-short-name>`, `bugfix/<issue-number-or-short-name>`, `chore/<short-name>`, `docs/<short-name>`.
+- Never commit directly to `main` — all changes must go through a PR.
+
+### Commits
+- Use Conventional Commits: `type(scope): description`
+- Allowed types: `feat`, `fix`, `chore`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `style`, `revert`
+- No Jira keys — this is a GitHub project; reference GitHub issues with `#<number>` in the PR body if relevant.
+- Do not add AI attribution trailers (`Co-authored-by`, `Made-with`, etc.).
+
+### Pull Requests
+- PR title must follow Conventional Commits format — enforced by `pr-title-conventional.yml` CI check.
+- Prefer squash merge: the PR title becomes the final commit subject on `main`.
+- Keep PRs focused; one logical change per PR.
+- Do not merge a PR with a failing CI check.
+- When a PR is opened, immediately label the corresponding issue `under-review`.
+- When a PR is merged, remove the `under-review` label from the corresponding issue and add `pending-release`.
+
+### Versioning & Releases
+- Versioning is fully automated by `release-please` — do NOT manually edit `version.txt` or `.github/.release-please-manifest.json`.
+- `release-please` derives the bump from squash-merge commit subjects on `main`:
+  - `feat:` → minor bump
+  - `fix:` → patch bump
+  - `feat!:` or `BREAKING CHANGE:` in body → major bump
+  - `chore:`, `docs:`, etc. → no release
+- On release, `publish.yml` automatically updates the Homebrew tap (`alcantaraleo/homebrew-graphus`).
+- Never push a release tag manually.
+
+<!-- graphus:start -->
+## Graphus
+
+Graphus slash commands are available in `.claude/commands`:
+
+- `/project:graphus-index`
+- `/project:graphus-sync`
+- `/project:graphus-query`
+- `/project:graphus-blast-radius`
+
+Use these commands to index Java/Spring code, sync incremental changes, query indexed symbols, and estimate blast radius from callers.
+<!-- graphus:end -->

@@ -190,18 +190,18 @@ Generates integration files for AI coding tools so they can invoke Graphus comma
 
 ```bash
 graphus install \
-  --tool cursor \
+  --tool claude-code \
   --project-dir /path/to/project
 ```
 
 | Option          | Description                                                |
 | --------------- | ---------------------------------------------------------- |
-| `--tool`        | AI tool to install for. Supported: `cursor`, `claude-code` |
+| `--tool`        | AI tool to install for. Supported: `claude-code`, `cursor` |
 | `--project-dir` | Target project directory (default: `.`)                    |
 
-**Cursor** — writes `.cursor/rules/graphus.mdc` with pre-configured commands and operating guidelines.
+**Claude Code** — writes `.claude/commands/graphus-*.md` and upserts a `## Graphus` section in `CLAUDE.md`.
 
-**Claude Code** — writes the equivalent integration file for Claude Code.
+**Cursor** — writes `.cursor/rules/graphus.mdc` with pre-configured commands and operating guidelines.
 
 ## Embedding Backends
 
