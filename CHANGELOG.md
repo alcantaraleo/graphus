@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/alcantaraleo/graphus/compare/v0.7.0...v0.8.0) (2026-05-21)
+
+
+### Features
+
+* **cli:** add git intelligence commands — git-analyze, hotspots, snapshot, drift ([#71](https://github.com/alcantaraleo/graphus/issues/71)) ([54263e5](https://github.com/alcantaraleo/graphus/commit/54263e5dcc1d4ed9367d76c561b058820c4ae1c4))
+* **mcp:** add MCP server with 7 code intelligence tools ([#73](https://github.com/alcantaraleo/graphus/issues/73)) ([c053e03](https://github.com/alcantaraleo/graphus/commit/c053e03aa7c5e1e99278a44d81be07c52cdf0f8e))
+* **parser:** add GuiceInjectionResolver for @Inject dependency edges ([#66](https://github.com/alcantaraleo/graphus/issues/66)) ([c2a3852](https://github.com/alcantaraleo/graphus/commit/c2a38523470a0562c54c85577490abf7cbc35455))
+* **parser:** add module dependency graph from Gradle build files ([#69](https://github.com/alcantaraleo/graphus/issues/69)) ([ff9e660](https://github.com/alcantaraleo/graphus/commit/ff9e660d1c6380815a578a07aa8770b01ad3c09d))
+
+
+### Bug Fixes
+
+* **ci:** fix performance benchmark — trailing underscore in collection name, switch to SQLite ([#77](https://github.com/alcantaraleo/graphus/issues/77)) ([eb0bcdc](https://github.com/alcantaraleo/graphus/commit/eb0bcdc3eab5313760248294f0a5a2cb30f833e2))
+* **model:** [#52](https://github.com/alcantaraleo/graphus/issues/52) sync MethodNode callers/callees on edge and node removal ([#53](https://github.com/alcantaraleo/graphus/issues/53)) ([04e126e](https://github.com/alcantaraleo/graphus/commit/04e126e6eedfccac3dc8c7b8dda713abd10d573f))
+
 ## [0.7.0](https://github.com/alcantaraleo/graphus/compare/v0.6.1...v0.7.0) (2026-05-05)
 
 
