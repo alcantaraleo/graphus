@@ -44,6 +44,7 @@ SAFE_TAG="${RELEASE_TAG//[^a-zA-Z0-9_]/_}"
   echo "| Generated (UTC) | ${UTC_NOW} |"
   echo "| Runner | ${RUNNER_OS} |"
   echo "| Embedding | local (ONNX MiniLM; cold CI runs may download weights unless cached) |"
+  echo "| Backend | SQLite (local JDBC, no daemon) |"
   echo ""
   echo "Tiers are named fixture repos at pinned refs (manifest: \`.github/performance-repos.json\`). Compare trends across releases; single CI runs vary."
   echo ""
@@ -86,10 +87,13 @@ while IFS=$'\t' read -r tier slug ref; do
   clone_repo "${slug}" "${ref}" "${dest}"
 
   collection="perf_${tier}_${SAFE_TAG}"
+  db_file="${WORKDIR}/graphus-${tier}.db"
 
+  echo "--- Benchmarking tier: ${tier} (${slug} @ ${ref}) ---"
   java -jar "${GRAPHUS_JAR}" index \
     --repo "${dest}" \
     --db sqlite \
+    --db-file "${db_file}" \
     --embedding local \
     --collection "${collection}" \
     --state-dir "${WORKDIR}/state-${tier}" \
