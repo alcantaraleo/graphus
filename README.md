@@ -22,7 +22,7 @@ Graphus is a Java CLI that parses Java and Kotlin + Spring Boot source code, bui
 - `graphus-model`: call graph and language-agnostic symbol domain model
 - `graphus-parser`: Java and Kotlin source parsing (JavaParser + Kotlin compiler PSI) and call graph construction, including the cross-language resolver
 - `graphus-indexer`: symbol chunk generation, LangChain4j `EmbeddingStore` integration (Chroma or SQLite), incremental sync via checksum registry (covers `.java` and `.kt` files), and `.graphus/config.json` persistence
-- `graphus-cli`: user-facing commands (`index`, `sync`, `query`, `blast-radius`, `install`)
+- `graphus-cli`: user-facing commands (`index`, `sync`, `query`, `blast-radius`, `install`, `serve`)
 
 ## Prerequisites
 
@@ -225,6 +225,25 @@ graphus query "where is user creation logic" --collection my-repo --embedding op
 `graphus index` / successful `sync` runs write **`{state-dir}/config.json`** with the resolved `{db,dbUrl,dbTimeoutSeconds?,dbFile?,embedding,collection}` so agents or Homebrew installs can rerun `sync`/`query` without repeating flags unless you intentionally override.
 
 Precedence whenever a flag is **omitted** on the CLI: **`config.json` → defaults** (`chroma` → `http://localhost:8000`, timeout `300`, embedding `local`, SQLite `<state-dir>/graphus.db`).
+
+## MCP Server
+
+After indexing, run `graphus install --tool claude-code` to register the MCP server automatically in `.claude/settings.local.json`.
+
+For manual setup, add to your MCP client settings:
+
+```json
+{
+  "mcpServers": {
+    "graphus": {
+      "command": "java",
+      "args": ["-jar", "/path/to/graphus.jar", "serve", "--repo", ".", "--db", "sqlite"]
+    }
+  }
+}
+```
+
+Available tools: `graphus_search`, `graphus_blast_radius`, `graphus_callers`, `graphus_callees`, `graphus_module_deps`, `graphus_hotspots`, `graphus_ownership`.
 
 ## Known Limitations
 

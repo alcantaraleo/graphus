@@ -16,7 +16,7 @@ Graphus is a Java CLI that parses Java and Kotlin + Spring Boot source code, bui
 | `graphus-model`   | Language-agnostic domain model — `CallGraph`, `SymbolNode`, `SpringMetadata`, `GuiceMetadata`                  |
 | `graphus-parser`  | Java (JavaParser) + Kotlin (`kotlin-compiler-embeddable` PSI) AST pipeline → `CallGraph` + cross-language pass |
 | `graphus-indexer` | LangChain4j `EmbeddingStore` (Chroma or SQLite), checksum sync over `.java` + `.kt` files, `config.json`       |
-| `graphus-cli`     | Picocli entry point — `index`, `sync`, `query`, `blast-radius`, `install`                                      |
+| `graphus-cli`     | Picocli entry point — `index`, `sync`, `query`, `blast-radius`, `install`, `serve`                             |
 
 See [Architecture](docs/architecture.md) for full class breakdown and data flow.
 
@@ -29,6 +29,7 @@ See [Architecture](docs/architecture.md) for full class breakdown and data flow.
 | `query`        | Natural language retrieval over indexed symbols                                        |
 | `blast-radius` | BFS traversal to find all callers of a symbol                                          |
 | `install`      | Write AI tool integration files (`claude-code`, `cursor`)                              |
+| `serve`        | Start an MCP server over STDIO for AI coding agents                                    |
 
 ```bash
 graphus <command> [options]
