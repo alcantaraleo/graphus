@@ -92,7 +92,7 @@ while IFS=$'\t' read -r tier slug ref; do
   json="${WORKDIR}/bench-${tier}.json"
   clone_repo "${slug}" "${ref}" "${dest}"
 
-  collection="perf_${tier}_${SAFE_TAG}"
+  collection="perf_${tier}_${SAFE_TAG}"  # used as the SQLite table name (prefixed by the store)
   db_file="${WORKDIR}/graphus-${tier}.db"
 
   echo "--- Benchmarking tier: ${tier} (${slug} @ ${ref}) ---"
