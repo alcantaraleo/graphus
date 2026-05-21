@@ -50,8 +50,8 @@ SAFE_TAG="${RELEASE_TAG//[^a-zA-Z0-9_]/_}"
   echo ""
   echo "## Results"
   echo ""
-  echo "| Tier | Repo @ ref | Workspace | Clear | Parse | Index | Checksum | Sum phases | Parsed files | Indexed symbols |"
-  echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+  echo "| Tier | Repo @ ref | Workspace | Clear | Parse | Index | Checksum | Sum phases | Parsed files | Indexed symbols | Wall clock | Sym/s |"
+  echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
 } >"${OUT_MD}"
 
 append_workspace_rows() {
@@ -60,7 +60,11 @@ append_workspace_rows() {
   local ref="$3"
   local json="$4"
 
-  jq -r --arg slug "${slug}" --arg ref "${ref}" --arg tier "${tier}" '
+  local total_wall_nanos
+  total_wall_nanos="$(jq '.totalWallNanos' "${json}")"
+
+  jq -r --arg slug "${slug}" --arg ref "${ref}" --arg tier "${tier}" \
+      --argjson wall "${total_wall_nanos}" '
     .workspaces[] |
     [
       $tier,
@@ -72,11 +76,13 @@ append_workspace_rows() {
       (.checksumNanos / 1000000000),
       ((.clearNanos + .parseNanos + .indexNanos + .checksumNanos) / 1000000000),
       .parsedFiles,
-      .indexedSymbols
+      .indexedSymbols,
+      ($wall / 1000000000),
+      (if .indexNanos > 0 then (.indexedSymbols / .indexNanos * 1000000000 | floor) else 0 end)
     ] | @tsv
-  ' "${json}" | while IFS=$'\t' read -r c0 c1 c2 c3 c4 c5 c6 c7 c8 c9; do
-    printf '| %s | %s | %s | %.2fs | %.2fs | %.2fs | %.2fs | %.2fs | %s | %s |\n' \
-      "${c0}" "${c1}" "${c2}" "${c3}" "${c4}" "${c5}" "${c6}" "${c7}" "${c8}" "${c9}" >>"${OUT_MD}"
+  ' "${json}" | while IFS=$'\t' read -r c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11; do
+    printf '| %s | %s | %s | %.2fs | %.2fs | %.2fs | %.2fs | %.2fs | %s | %s | %.2fs | %s |\n' \
+      "${c0}" "${c1}" "${c2}" "${c3}" "${c4}" "${c5}" "${c6}" "${c7}" "${c8}" "${c9}" "${c10}" "${c11}" >>"${OUT_MD}"
   done
 }
 
@@ -105,7 +111,7 @@ done < <(jq -r '.repos[] | "\(.tier)\t\(.slug)\t\(.ref)"' "${REPOS_JSON}")
 
 {
   echo ""
-  echo "**Sum phases** is clear+parse+index+checksum for that workspace row. Global wall clock per tier JSON includes \`totalWallNanos\` (full JVM run)."
+  echo "**Sum phases** is clear+parse+index+checksum for that workspace row. **Wall clock** is the full JVM run time for the tier (includes all workspaces + startup). **Sym/s** is symbols indexed per second (indexedSymbols ÷ indexNanos)."
   echo ""
   echo "## Raw JSON (per tier)"
   echo ""
