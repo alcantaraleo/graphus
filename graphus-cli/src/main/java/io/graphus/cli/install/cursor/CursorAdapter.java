@@ -77,6 +77,14 @@ public final class CursorAdapter implements ToolAdapter {
 
                 Use to identify callers that can impact a target symbol.
 
+                ### MCP Server
+
+                ```bash
+                graphus serve --repo . --db sqlite
+                ```
+
+                Starts an MCP server over STDIO for AI coding agents (Claude Code, Cursor, Copilot). After indexing, register automatically with `graphus install --tool claude-code` or `graphus install --tool cursor`.
+
                 ## Operating Guidelines
 
                 - `--collection` defaults to the repository/current directory name and can be omitted in most cases. Pass it explicitly only when targeting a collection with a different name.

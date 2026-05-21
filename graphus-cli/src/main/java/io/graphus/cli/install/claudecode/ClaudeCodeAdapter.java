@@ -4,6 +4,7 @@ import io.graphus.cli.install.ToolAdapter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public final class ClaudeCodeAdapter implements ToolAdapter {
 
@@ -32,6 +33,25 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
 
         Path claudeMd = projectDir.resolve("CLAUDE.md");
         upsertGraphusSection(claudeMd);
+
+        Path graphusJar = resolveGraphusJar();
+        if (graphusJar != null) {
+            new ClaudeCodeMcpSettingsInstaller().install(projectDir, graphusJar);
+        } else {
+            System.err.println("[graphus] Warning: could not locate graphus.jar; skipping MCP server registration.");
+        }
+    }
+
+    private static Path resolveGraphusJar() {
+        try {
+            java.net.URI location = ClaudeCodeAdapter.class
+                    .getProtectionDomain().getCodeSource().getLocation().toURI();
+            Path jar = Paths.get(location);
+            if (jar.toString().endsWith(".jar")) {
+                return jar;
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private static void write(Path path, String content) throws IOException {
@@ -64,7 +84,9 @@ public final class ClaudeCodeAdapter implements ToolAdapter {
                 <!-- graphus:start -->
                 ## Graphus
 
-                Graphus slash commands are available in `.claude/commands`:
+                Graphus MCP server is registered in `.claude/settings.local.json` — tools are available directly to Claude Code agents.
+
+                Graphus slash commands are also available in `.claude/commands`:
 
                 - `/project:graphus-index`
                 - `/project:graphus-sync`
