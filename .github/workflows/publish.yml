@@ -55,7 +55,7 @@ jobs:
           TAP_REPO="${HOMEBREW_TAP_REPO:-alcantaraleo/homebrew-graphus}"
 
           # Use the JAR already built in this job — no extra download needed.
-          SHA256="$(shasum -a 256 graphus-cli/build/libs/graphus.jar | awk '{print $1}')"
+          SHA256="$(sha256sum graphus-cli/build/libs/graphus.jar | awk '{print $1}')"
           echo "Version: ${VERSION}  SHA256: ${SHA256}"
 
           # Render formula from main repo source (Formula/graphus.rb) into a temp file.
