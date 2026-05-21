@@ -2,13 +2,11 @@
 set -euo pipefail
 
 # Generates PERFORMANCE.md from graphus index --benchmark-json runs.
-# Env: GRAPHUS_JAR, CHROMA_URL, RELEASE_TAG, RUNNER_OS, CHROMA_IMAGE, REPOS_JSON, OUT_MD
+# Env: GRAPHUS_JAR, RELEASE_TAG, RUNNER_OS, REPOS_JSON, OUT_MD
 
 GRAPHUS_JAR="${GRAPHUS_JAR:?GRAPHUS_JAR required}"
-CHROMA_URL="${CHROMA_URL:?CHROMA_URL required}"
 RELEASE_TAG="${RELEASE_TAG:?RELEASE_TAG required}"
 RUNNER_OS="${RUNNER_OS:-unknown}"
-CHROMA_IMAGE="${CHROMA_IMAGE:-chromadb/chroma:1.1.0}"
 REPOS_JSON="${REPOS_JSON:?REPOS_JSON required}"
 OUT_MD="${OUT_MD:?OUT_MD required}"
 WORKDIR="${WORKDIR:-${RUNNER_TEMP:-/tmp}/graphus-perf}"
@@ -45,8 +43,6 @@ SAFE_TAG="${RELEASE_TAG//[^a-zA-Z0-9_]/_}"
   echo "| --- | --- |"
   echo "| Generated (UTC) | ${UTC_NOW} |"
   echo "| Runner | ${RUNNER_OS} |"
-  echo "| Chroma image | ${CHROMA_IMAGE} |"
-  echo "| Chroma URL (in job) | ${CHROMA_URL} |"
   echo "| Embedding | local (ONNX MiniLM; cold CI runs may download weights unless cached) |"
   echo ""
   echo "Tiers are named fixture repos at pinned refs (manifest: \`.github/performance-repos.json\`). Compare trends across releases; single CI runs vary."
@@ -93,8 +89,7 @@ while IFS=$'\t' read -r tier slug ref; do
 
   java -jar "${GRAPHUS_JAR}" index \
     --repo "${dest}" \
-    --db chroma \
-    --db-url "${CHROMA_URL}" \
+    --db sqlite \
     --embedding local \
     --collection "${collection}" \
     --state-dir "${WORKDIR}/state-${tier}" \
