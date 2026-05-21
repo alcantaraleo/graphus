@@ -139,16 +139,17 @@ Accepts the same options as `index`. Exits with an error if no checksum registry
 
 ### Homebrew release automation
 
+The formula source of truth is `Formula/graphus.rb` in this repository.
+
 On every GitHub Release publish event, `.github/workflows/publish.yml`:
 
 1. Uploads `graphus.jar` and `graphus` release assets.
-2. Computes SHA-256 for `graphus.jar`.
-3. Updates `Formula/graphus.rb` in the Homebrew tap repo (default `alcantaraleo/homebrew-graphus`) with the release version and checksum.
-4. Commits and pushes the formula bump to the tap.
+2. Reads `Formula/graphus.rb` from the workspace, substitutes the release version and `sha256`, and validates Ruby syntax.
+3. Pushes the rendered formula to the tap repo (default `alcantaraleo/homebrew-graphus`), which is a CI-managed mirror — never edit it directly.
 
 Required GitHub configuration:
 
-- Repository secret: `HOMEBREW_TAP_TOKEN` (PAT with push access to the tap repository)
+- Repository secret: `HOMEBREW_TAP_TOKEN` (PAT with push access to the tap repository) — **required**; missing token now causes a hard CI failure.
 - Optional repository variable: `HOMEBREW_TAP_REPO` (override tap repo; default is `alcantaraleo/homebrew-graphus`)
 
 ### Query Indexed Symbols

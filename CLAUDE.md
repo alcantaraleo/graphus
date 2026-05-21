@@ -47,11 +47,13 @@ Any change to how Graphus is built, packaged, or distributed — including chang
 
 ### Homebrew release flow
 
-- Homebrew distribution uses a separate tap repository (default: `alcantaraleo/homebrew-graphus`).
-- On GitHub Release publish, `.github/workflows/publish.yml` uploads release assets and updates the tap formula (`Formula/graphus.rb`) with:
-  - release version (from tag `vX.Y.Z`)
-  - computed `sha256` of `graphus.jar`
-- Required secret: `HOMEBREW_TAP_TOKEN` with push access to the tap repository.
+- The formula source of truth is `Formula/graphus.rb` in this repo. Edit formula logic here; never edit `alcantaraleo/homebrew-graphus` by hand.
+- On GitHub Release publish, `.github/workflows/publish.yml`:
+  1. Reads `Formula/graphus.rb` from the workspace.
+  2. Substitutes the release version and `sha256` of the built `graphus.jar`.
+  3. Validates Ruby syntax (`ruby -c`).
+  4. Pushes the rendered formula to the `alcantaraleo/homebrew-graphus` tap (a CI-managed mirror).
+- Required secret: `HOMEBREW_TAP_TOKEN` with push access to the tap repository. Missing token now causes a hard CI failure (not a silent skip).
 - Optional repository variable: `HOMEBREW_TAP_REPO` to override the default tap repository.
 
 ## Key Conventions
