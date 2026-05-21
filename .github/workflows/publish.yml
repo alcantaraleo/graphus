@@ -44,31 +44,36 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
-            echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap update."
-            exit 0
+            echo "::error::HOMEBREW_TAP_TOKEN is not set — Homebrew tap will not be updated."
+            exit 1
           fi
 
           TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
           TAP_REPO="${HOMEBREW_TAP_REPO:-alcantaraleo/homebrew-graphus}"
 
-          echo "Downloading release asset graphus.jar for ${TAG}"
-          gh release download "${TAG}" --repo "${{ github.repository }}" --pattern graphus.jar --dir . --clobber
-          SHA256="$(shasum -a 256 graphus.jar | awk '{print $1}')"
+          # Use the JAR already built in this job — no extra download needed.
+          SHA256="$(shasum -a 256 graphus-cli/build/libs/graphus.jar | awk '{print $1}')"
+          echo "Version: ${VERSION}  SHA256: ${SHA256}"
 
-          echo "Updating Formula/graphus.rb in ${TAP_REPO} with version ${VERSION}"
+          # Render formula from main repo source (Formula/graphus.rb) into a temp file.
+          cp Formula/graphus.rb /tmp/graphus.rb
+          sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" /tmp/graphus.rb
+          sed -i "s/sha256 \"[^\"]*\"/sha256 \"${SHA256}\"/" /tmp/graphus.rb
+
+          # Validate Ruby syntax before touching the tap.
+          ruby -c /tmp/graphus.rb
+
+          # Push rendered formula to tap.
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap-repo
-          perl -0pi -e "s/version \"[^\"]+\"/version \"${VERSION}\"/g; s/sha256 \"[^\"]+\"/sha256 \"${SHA256}\"/g" tap-repo/Formula/graphus.rb
-
+          cp /tmp/graphus.rb tap-repo/Formula/graphus.rb
           cd tap-repo
           if git diff --quiet; then
             echo "Formula unchanged; nothing to commit."
             exit 0
           fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/graphus.rb
