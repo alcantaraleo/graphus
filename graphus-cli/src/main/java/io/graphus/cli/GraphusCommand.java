@@ -3,6 +3,7 @@ package io.graphus.cli;
 import io.graphus.cli.install.InstallCommand;
 import io.graphus.cli.GitAnalyzeCommand;
 import io.graphus.cli.HotspotsCommand;
+import io.graphus.cli.ServeCommand;
 import io.graphus.cli.SnapshotCommand;
 import io.graphus.cli.DriftCommand;
 import io.graphus.indexer.EmbeddingBackend;
@@ -46,6 +47,7 @@ import picocli.CommandLine.Parameters;
                 GraphusCommand.QueryCommand.class,
                 GraphusCommand.BlastRadiusCommand.class,
                 InstallCommand.class,
+                ServeCommand.class,
                 GitAnalyzeCommand.class,
                 HotspotsCommand.class,
                 SnapshotCommand.class,
