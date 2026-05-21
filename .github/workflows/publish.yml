@@ -110,11 +110,6 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    services:
-      chroma:
-        image: chromadb/chroma:1.1.0
-        ports:
-          - 8000:8000
 
     steps:
       - name: Checkout
@@ -134,22 +129,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-graphus-perf-
 
-      - name: Wait for Chroma
-        env:
-          CHROMA_URL: http://127.0.0.1:8000
-        run: |
-          set -e
-          for _ in $(seq 1 90); do
-            if curl -sf "${CHROMA_URL}/api/v1/heartbeat" >/dev/null 2>&1 \
-              || curl -sf "${CHROMA_URL}/api/v2/heartbeat" >/dev/null 2>&1; then
-              echo "Chroma ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Chroma did not become ready in time"
-          exit 1
-
       - name: Download released graphus.jar
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,10 +143,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPHUS_JAR: ${{ github.workspace }}/graphus.jar
-          CHROMA_URL: http://127.0.0.1:8000
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RUNNER_OS: ${{ runner.os }}-${{ runner.arch }}
-          CHROMA_IMAGE: chromadb/chroma:1.1.0
           REPOS_JSON: ${{ github.workspace }}/.github/performance-repos.json
           OUT_MD: /tmp/PERFORMANCE.md
         run: |

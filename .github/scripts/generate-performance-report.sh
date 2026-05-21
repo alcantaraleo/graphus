@@ -2,13 +2,11 @@
 set -euo pipefail
 
 # Generates PERFORMANCE.md from graphus index --benchmark-json runs.
-# Env: GRAPHUS_JAR, CHROMA_URL, RELEASE_TAG, RUNNER_OS, CHROMA_IMAGE, REPOS_JSON, OUT_MD
+# Env: GRAPHUS_JAR, RELEASE_TAG, RUNNER_OS, REPOS_JSON, OUT_MD
 
 GRAPHUS_JAR="${GRAPHUS_JAR:?GRAPHUS_JAR required}"
-CHROMA_URL="${CHROMA_URL:?CHROMA_URL required}"
 RELEASE_TAG="${RELEASE_TAG:?RELEASE_TAG required}"
 RUNNER_OS="${RUNNER_OS:-unknown}"
-CHROMA_IMAGE="${CHROMA_IMAGE:-chromadb/chroma:1.1.0}"
 REPOS_JSON="${REPOS_JSON:?REPOS_JSON required}"
 OUT_MD="${OUT_MD:?OUT_MD required}"
 WORKDIR="${WORKDIR:-${RUNNER_TEMP:-/tmp}/graphus-perf}"
@@ -32,7 +30,7 @@ clone_repo() {
 }
 
 UTC_NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-SAFE_TAG="$(echo "${RELEASE_TAG}" | tr -c 'a-zA-Z0-9_' '_')"
+SAFE_TAG="${RELEASE_TAG//[^a-zA-Z0-9_]/_}"
 
 {
   echo "# Graphus indexing performance"
@@ -45,16 +43,15 @@ SAFE_TAG="$(echo "${RELEASE_TAG}" | tr -c 'a-zA-Z0-9_' '_')"
   echo "| --- | --- |"
   echo "| Generated (UTC) | ${UTC_NOW} |"
   echo "| Runner | ${RUNNER_OS} |"
-  echo "| Chroma image | ${CHROMA_IMAGE} |"
-  echo "| Chroma URL (in job) | ${CHROMA_URL} |"
   echo "| Embedding | local (ONNX MiniLM; cold CI runs may download weights unless cached) |"
+  echo "| Backend | SQLite (local JDBC, no daemon) |"
   echo ""
   echo "Tiers are named fixture repos at pinned refs (manifest: \`.github/performance-repos.json\`). Compare trends across releases; single CI runs vary."
   echo ""
   echo "## Results"
   echo ""
-  echo "| Tier | Repo @ ref | Workspace | Clear | Parse | Index | Checksum | Sum phases | Parsed files | Indexed symbols |"
-  echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+  echo "| Tier | Repo @ ref | Workspace | Clear | Parse | Index | Checksum | Sum phases | Parsed files | Indexed symbols | Wall clock | Sym/s |"
+  echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
 } >"${OUT_MD}"
 
 append_workspace_rows() {
@@ -63,7 +60,11 @@ append_workspace_rows() {
   local ref="$3"
   local json="$4"
 
-  jq -r --arg slug "${slug}" --arg ref "${ref}" --arg tier "${tier}" '
+  local total_wall_nanos
+  total_wall_nanos="$(jq '.totalWallNanos' "${json}")"
+
+  jq -r --arg slug "${slug}" --arg ref "${ref}" --arg tier "${tier}" \
+      --argjson wall "${total_wall_nanos}" '
     .workspaces[] |
     [
       $tier,
@@ -75,11 +76,13 @@ append_workspace_rows() {
       (.checksumNanos / 1000000000),
       ((.clearNanos + .parseNanos + .indexNanos + .checksumNanos) / 1000000000),
       .parsedFiles,
-      .indexedSymbols
+      .indexedSymbols,
+      ($wall / 1000000000),
+      (if .indexNanos > 0 then (.indexedSymbols / .indexNanos * 1000000000 | floor) else 0 end)
     ] | @tsv
-  ' "${json}" | while IFS=$'\t' read -r c0 c1 c2 c3 c4 c5 c6 c7 c8 c9; do
-    printf '| %s | %s | %s | %.2fs | %.2fs | %.2fs | %.2fs | %.2fs | %s | %s |\n' \
-      "${c0}" "${c1}" "${c2}" "${c3}" "${c4}" "${c5}" "${c6}" "${c7}" "${c8}" "${c9}" >>"${OUT_MD}"
+  ' "${json}" | while IFS=$'\t' read -r c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11; do
+    printf '| %s | %s | %s | %.2fs | %.2fs | %.2fs | %.2fs | %.2fs | %s | %s | %.2fs | %s |\n' \
+      "${c0}" "${c1}" "${c2}" "${c3}" "${c4}" "${c5}" "${c6}" "${c7}" "${c8}" "${c9}" "${c10}" "${c11}" >>"${OUT_MD}"
   done
 }
 
@@ -89,12 +92,14 @@ while IFS=$'\t' read -r tier slug ref; do
   json="${WORKDIR}/bench-${tier}.json"
   clone_repo "${slug}" "${ref}" "${dest}"
 
-  collection="perf_${tier}_${SAFE_TAG}"
+  collection="perf_${tier}_${SAFE_TAG}"  # used as the SQLite table name (prefixed by the store)
+  db_file="${WORKDIR}/graphus-${tier}.db"
 
+  echo "--- Benchmarking tier: ${tier} (${slug} @ ${ref}) ---"
   java -jar "${GRAPHUS_JAR}" index \
     --repo "${dest}" \
-    --db chroma \
-    --db-url "${CHROMA_URL}" \
+    --db sqlite \
+    --db-file "${db_file}" \
     --embedding local \
     --collection "${collection}" \
     --state-dir "${WORKDIR}/state-${tier}" \
@@ -106,7 +111,7 @@ done < <(jq -r '.repos[] | "\(.tier)\t\(.slug)\t\(.ref)"' "${REPOS_JSON}")
 
 {
   echo ""
-  echo "**Sum phases** is clear+parse+index+checksum for that workspace row. Global wall clock per tier JSON includes \`totalWallNanos\` (full JVM run)."
+  echo "**Sum phases** is clear+parse+index+checksum for that workspace row. **Wall clock** is the full JVM run time for the tier (includes all workspaces + startup). **Sym/s** is symbols indexed per second (indexedSymbols ÷ indexNanos)."
   echo ""
   echo "## Raw JSON (per tier)"
   echo ""
