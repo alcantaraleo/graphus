@@ -32,7 +32,7 @@ clone_repo() {
 }
 
 UTC_NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-SAFE_TAG="$(echo "${RELEASE_TAG}" | tr -c 'a-zA-Z0-9_' '_')"
+SAFE_TAG="${RELEASE_TAG//[^a-zA-Z0-9_]/_}"
 
 {
   echo "# Graphus indexing performance"
