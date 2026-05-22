@@ -24,6 +24,15 @@ public final class GradleSettingsParser {
 
     private static final Pattern QUOTED_TOKEN = Pattern.compile("[\"']([^\"']+)[\"']");
 
+    /**
+     * Matches the Groovy space-call form: {@code include "a:b"} or {@code include 'a', 'b'}.
+     * The negative lookahead {@code (?!\()} excludes the parenthesised form which is already
+     * handled by {@link #INCLUDE_BLOCK}.
+     */
+    private static final Pattern INCLUDE_SPACE_FORM = Pattern.compile(
+            "(?m)^[ \\t]*include[ \\t]+(?!\\()([^\\n]+)"
+    );
+
     private GradleSettingsParser() {
     }
 
@@ -49,6 +58,19 @@ public final class GradleSettingsParser {
                 }
             }
         }
+
+        Matcher spaceMatcher = INCLUDE_SPACE_FORM.matcher(stripped);
+        while (spaceMatcher.find()) {
+            String tail = spaceMatcher.group(1);
+            Matcher tokenMatcher = QUOTED_TOKEN.matcher(tail);
+            while (tokenMatcher.find()) {
+                String normalized = gradleIncludeToRelativePath(tokenMatcher.group(1));
+                if (!normalized.isEmpty()) {
+                    orderedUnique.add(normalized);
+                }
+            }
+        }
+
         return List.copyOf(orderedUnique);
     }
 

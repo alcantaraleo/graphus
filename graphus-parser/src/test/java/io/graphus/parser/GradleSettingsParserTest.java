@@ -43,4 +43,56 @@ class GradleSettingsParserTest {
                 lineWithTrailingComment.indexOf("//"),
                 GradleSettingsParser.lineCommentStart(lineWithTrailingComment));
     }
+
+    @Test
+    void parsesGroovySpaceFormDoubleQuote(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("settings.gradle");
+        Files.writeString(file, """
+                rootProject.name = "spring-boot"
+                include "spring-boot-project:spring-boot"
+                include "spring-boot-project:spring-boot-tools:spring-boot-buildpack-platform"
+                """);
+        assertEquals(
+                List.of(
+                        "spring-boot-project/spring-boot",
+                        "spring-boot-project/spring-boot-tools/spring-boot-buildpack-platform"),
+                GradleSettingsParser.parseModuleNames(file));
+    }
+
+    @Test
+    void parsesGroovySpaceFormSingleQuote(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("settings.gradle");
+        Files.writeString(file, """
+                include 'core'
+                include 'api', 'web'
+                """);
+        assertEquals(
+                List.of("core", "api", "web"),
+                GradleSettingsParser.parseModuleNames(file));
+    }
+
+    @Test
+    void parsesGroovySpaceFormSingleQuoteWithColonSeparator(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("settings.gradle");
+        Files.writeString(file, """
+                include ':services:payments'
+                """);
+        assertEquals(
+                List.of("services/payments"),
+                GradleSettingsParser.parseModuleNames(file));
+    }
+
+    @Test
+    void mixedParenthesisedAndSpaceFormDeduplicates(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("settings.gradle");
+        Files.writeString(file, """
+                include("core")
+                include "api"
+                // include "commented-out"
+                include 'web'
+                """);
+        assertEquals(
+                List.of("core", "api", "web"),
+                GradleSettingsParser.parseModuleNames(file));
+    }
 }
