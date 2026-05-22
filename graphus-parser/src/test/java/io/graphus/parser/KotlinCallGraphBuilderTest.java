@@ -108,6 +108,42 @@ class KotlinCallGraphBuilderTest {
         // Resolved to String or left unresolved — both are acceptable (no full type inference).
     }
 
+    @Test
+    void resolvesExtensionCallWhenReceiverTextMatchesTypeSuffix(@TempDir Path tempDir)
+            throws IOException {
+        // Parameter named identically to the type: receiver text == type name → endsWith fires.
+        Path meterExt = writeFile(tempDir, "MeterExt.kt",
+                """
+                package demo
+                class Meter(val value: Double)
+                fun Meter.fmt(): String = "${value}m"
+                """);
+        Path doubleExt = writeFile(tempDir, "DoubleExt.kt",
+                """
+                package demo
+                fun Double.fmt(): String = "${this}d"
+                """);
+        Path converter = writeFile(tempDir, "Converter.kt",
+                """
+                package demo
+                class Converter {
+                    fun convert(Meter: Meter): String = Meter.fmt()
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, meterExt, doubleExt, converter);
+
+        // Meter.fmt() — receiver text "Meter" endsWith receiverType "Meter" → String ext wins.
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Converter.convert(Meter)", "demo.MeterExtKt.fmt()")),
+                "When receiver text equals the type name, must resolve to the Meter extension");
+        assertFalse(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Converter.convert(Meter)", "demo.DoubleExtKt.fmt()")),
+                "Must not resolve to the Double extension");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 
