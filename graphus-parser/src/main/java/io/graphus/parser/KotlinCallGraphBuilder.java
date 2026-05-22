@@ -14,6 +14,9 @@ import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
 import org.jetbrains.kotlin.psi.KtExpression;
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
+import org.jetbrains.kotlin.psi.KtPostfixExpression;
+import org.jetbrains.kotlin.psi.KtPrefixExpression;
+import org.jetbrains.kotlin.psi.KtUnaryExpression;
 import org.jetbrains.kotlin.psi.KtValueArgument;
 
 /**
@@ -27,6 +30,14 @@ import org.jetbrains.kotlin.psi.KtValueArgument;
  * {@link CrossLanguageCallResolver} can attempt Kotlin→Java resolution in a later pass.
  */
 public final class KotlinCallGraphBuilder {
+
+    private static final Map<String, String> UNARY_OPERATOR_TO_METHOD = Map.of(
+            "PLUS", "unaryPlus",
+            "MINUS", "unaryMinus",
+            "EXCL", "not",
+            "PLUSPLUS", "inc",
+            "MINUSMINUS", "dec"
+    );
 
     private static final Map<String, String> BINARY_OPERATOR_TO_METHOD = Map.ofEntries(
             Map.entry("PLUS", "plus"),
@@ -111,6 +122,20 @@ public final class KotlinCallGraphBuilder {
                             UnresolvedCallRecord.Origin.KOTLIN));
                 }
             }
+            for (KtPrefixExpression prefix : findAllPrefixExpressions(body)) {
+                String tokenName = prefix.getOperationToken().toString();
+                String methodName = UNARY_OPERATOR_TO_METHOD.get(tokenName);
+                if (methodName == null) continue;
+                unresolvedCalls += resolveUnaryOperator(callGraph, callerId, declaration, prefix,
+                        methodName, kotlinMethodsByName, records);
+            }
+            for (KtPostfixExpression postfix : findAllPostfixExpressions(body)) {
+                String tokenName = postfix.getOperationToken().toString();
+                String methodName = UNARY_OPERATOR_TO_METHOD.get(tokenName);
+                if (methodName == null) continue;
+                unresolvedCalls += resolveUnaryOperator(callGraph, callerId, declaration, postfix,
+                        methodName, kotlinMethodsByName, records);
+            }
         }
 
         return new BuildResult(unresolvedCalls, List.copyOf(records));
@@ -148,6 +173,55 @@ public final class KotlinCallGraphBuilder {
                 .findChildrenOfType(root, KtBinaryExpression.class)
                 .forEach(result::add);
         return result;
+    }
+
+    private static List<KtPrefixExpression> findAllPrefixExpressions(KtExpression root) {
+        List<KtPrefixExpression> result = new ArrayList<>();
+        if (root instanceof KtPrefixExpression r) {
+            result.add(r);
+        }
+        org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
+                .findChildrenOfType(root, KtPrefixExpression.class)
+                .forEach(result::add);
+        return result;
+    }
+
+    private static List<KtPostfixExpression> findAllPostfixExpressions(KtExpression root) {
+        List<KtPostfixExpression> result = new ArrayList<>();
+        if (root instanceof KtPostfixExpression r) {
+            result.add(r);
+        }
+        org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
+                .findChildrenOfType(root, KtPostfixExpression.class)
+                .forEach(result::add);
+        return result;
+    }
+
+    private static int resolveUnaryOperator(
+            CallGraph callGraph,
+            String callerId,
+            KtDeclarationWithBody declaration,
+            KtUnaryExpression unary,
+            String methodName,
+            Map<String, List<MethodNode>> kotlinMethodsByName,
+            List<UnresolvedCallRecord> records) {
+        List<MethodNode> candidates = kotlinMethodsByName.getOrDefault(methodName, List.of()).stream()
+                .filter(node -> arityOf(node.getSignature()) == 0)
+                .toList();
+        if (candidates.size() == 1) {
+            callGraph.addEdge(callerId, candidates.get(0).getId());
+            return 0;
+        } else if (!candidates.isEmpty()) {
+            String unresolvedId = "UNRESOLVED:OP:" + methodName + "/0@" + callerId
+                    + "#" + System.identityHashCode(unary);
+            callGraph.addNode(new UnresolvedNode(
+                    unresolvedId, unary.getText(), relativeFilePathOf(declaration), lineOf(unary)));
+            callGraph.addEdge(callerId, unresolvedId);
+            records.add(new UnresolvedCallRecord(callerId, methodName, 0, unresolvedId,
+                    UnresolvedCallRecord.Origin.KOTLIN));
+            return 1;
+        }
+        return 0;
     }
 
     private static CallSiteSignature signatureOf(KtCallExpression call) {

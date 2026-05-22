@@ -99,6 +99,28 @@ class KotlinCallGraphBuilderTest {
                 "Binary '+' on Vector must resolve to operator fun plus(Vector)");
     }
 
+    @Test
+    void resolvesUnaryOperatorOverloadAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Counter.kt",
+                """
+                package demo
+
+                class Counter(var value: Int) {
+                    operator fun inc(): Counter = Counter(value + 1)
+                    fun step(): Counter { var c = this; return ++c }
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Counter.step()", "demo.Counter.inc()")),
+                "Prefix '++' must resolve to operator fun inc()");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 
