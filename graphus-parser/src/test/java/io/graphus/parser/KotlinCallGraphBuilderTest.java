@@ -187,6 +187,73 @@ class KotlinCallGraphBuilderTest {
                 "Lambda parameter invocation must produce an UNRESOLVED:LAMBDA: tagged node");
     }
 
+    @Test
+    void disambiguatesExtensionCallByReceiverTypeWhenNameAndArityCollide(@TempDir Path tempDir)
+            throws IOException {
+        Path stringExt = writeFile(tempDir, "StringExt.kt",
+                """
+                package demo
+                fun String.shout(): String = this.uppercase() + "!"
+                """);
+        Path intExt = writeFile(tempDir, "IntExt.kt",
+                """
+                package demo
+                fun Int.shout(): String = this.toString() + "!"
+                """);
+        Path greeter = writeFile(tempDir, "Greeter.kt",
+                """
+                package demo
+                class Greeter {
+                    fun greetString(s: String): String = s.shout()
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, stringExt, intExt, greeter);
+
+        Set<CallEdge> edges = output.graph().getEdges();
+        // Must not resolve s.shout() to the Int extension when receiver is a String variable.
+        assertFalse(
+                edges.contains(new CallEdge("demo.Greeter.greetString(String)", "demo.IntExtKt.shout()")),
+                "Must not resolve s.shout() to the Int extension");
+        // Resolved to String or left unresolved — both are acceptable (no full type inference).
+    }
+
+    @Test
+    void resolvesExtensionCallWhenReceiverTextMatchesTypeSuffix(@TempDir Path tempDir)
+            throws IOException {
+        // Parameter named identically to the type: receiver text == type name → endsWith fires.
+        Path meterExt = writeFile(tempDir, "MeterExt.kt",
+                """
+                package demo
+                class Meter(val value: Double)
+                fun Meter.fmt(): String = "${value}m"
+                """);
+        Path doubleExt = writeFile(tempDir, "DoubleExt.kt",
+                """
+                package demo
+                fun Double.fmt(): String = "${this}d"
+                """);
+        Path converter = writeFile(tempDir, "Converter.kt",
+                """
+                package demo
+                class Converter {
+                    fun convert(Meter: Meter): String = Meter.fmt()
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, meterExt, doubleExt, converter);
+
+        // Meter.fmt() — receiver text "Meter" endsWith receiverType "Meter" → String ext wins.
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Converter.convert(Meter)", "demo.MeterExtKt.fmt()")),
+                "When receiver text equals the type name, must resolve to the Meter extension");
+        assertFalse(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Converter.convert(Meter)", "demo.DoubleExtKt.fmt()")),
+                "Must not resolve to the Double extension");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 

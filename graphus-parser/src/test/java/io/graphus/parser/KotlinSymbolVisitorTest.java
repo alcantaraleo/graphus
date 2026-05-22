@@ -164,6 +164,24 @@ class KotlinSymbolVisitorTest {
         assertTrue(squareNode instanceof MethodNode);
     }
 
+    @Test
+    void extensionFunctionCarriesReceiverType(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "StringExt.kt",
+                """
+                package demo
+                fun String.shout(): String = this.uppercase() + "!"
+                """);
+
+        CallGraph callGraph = parseInto(tempDir, source);
+
+        MethodNode shout = (MethodNode) callGraph.getNode("demo.StringExtKt.shout()");
+        assertNotNull(shout, "Extension function must be indexed under the file facade");
+        assertEquals("String", shout.getReceiverType(),
+                "Receiver type must be captured from getReceiverTypeReference()");
+    }
+
     private static Path writeFile(Path dir, String name, String contents) throws IOException {
         Path file = dir.resolve(name);
         Files.writeString(file, contents);

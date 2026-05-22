@@ -11,10 +11,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.psi.KtArrayAccessExpression;
 import org.jetbrains.kotlin.psi.KtBinaryExpression;
 import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
+import org.jetbrains.kotlin.psi.KtDotQualifiedExpression;
 import org.jetbrains.kotlin.psi.KtExpression;
 import org.jetbrains.kotlin.psi.KtFunctionType;
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
@@ -89,6 +91,19 @@ public final class KotlinCallGraphBuilder {
                 if (candidates.size() == 1) {
                     callGraph.addEdge(callerId, candidates.get(0).getId());
                     continue;
+                }
+                if (candidates.size() > 1) {
+                    String receiverText = receiverTextOf(call);
+                    if (!receiverText.isEmpty()) {
+                        List<MethodNode> narrowed = candidates.stream()
+                                .filter(node -> !node.getReceiverType().isEmpty()
+                                        && node.getReceiverType().endsWith(receiverText))
+                                .toList();
+                        if (narrowed.size() == 1) {
+                            callGraph.addEdge(callerId, narrowed.get(0).getId());
+                            continue;
+                        }
+                    }
                 }
                 unresolvedCalls++;
                 boolean isLambdaInvocation = lambdaParams.contains(signature.name());
@@ -240,7 +255,7 @@ public final class KotlinCallGraphBuilder {
     }
 
     private static boolean isLhsOfAssignment(KtArrayAccessExpression arrayAccess) {
-        org.jetbrains.kotlin.com.intellij.psi.PsiElement parent = arrayAccess.getParent();
+        PsiElement parent = arrayAccess.getParent();
         if (!(parent instanceof KtBinaryExpression binary)) {
             return false;
         }
@@ -373,6 +388,19 @@ public final class KotlinCallGraphBuilder {
             }
         }
         return names;
+    }
+
+    private static String receiverTextOf(KtCallExpression call) {
+        PsiElement parent = call.getParent();
+        if (!(parent instanceof KtDotQualifiedExpression dotQual)) {
+            return "";
+        }
+        KtExpression receiver = dotQual.getReceiverExpression();
+        if (receiver == null) {
+            return "";
+        }
+        String text = receiver.getText();
+        return text == null ? "" : text.trim();
     }
 
     private record CallSiteSignature(String name, int arity) {

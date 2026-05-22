@@ -17,6 +17,7 @@ public final class MethodNode extends SymbolNode {
     private final Set<String> callees = new LinkedHashSet<>();
     private final SpringMetadata springMetadata;
     private final GuiceMetadata guiceMetadata;
+    private final String receiverType;
 
     public MethodNode(
             String id,
@@ -63,6 +64,26 @@ public final class MethodNode extends SymbolNode {
             SpringMetadata springMetadata,
             GuiceMetadata guiceMetadata
     ) {
+        this(id, kind, declaringClassId, name, signature, returnType, params, modifiers,
+                annotations, filePath, line, springMetadata, guiceMetadata, "");
+    }
+
+    public MethodNode(
+            String id,
+            SymbolKind kind,
+            String declaringClassId,
+            String name,
+            String signature,
+            String returnType,
+            List<MethodParam> params,
+            List<String> modifiers,
+            List<String> annotations,
+            String filePath,
+            int line,
+            SpringMetadata springMetadata,
+            GuiceMetadata guiceMetadata,
+            String receiverType
+    ) {
         super(id, kind == null ? SymbolKind.METHOD : kind, filePath, line);
         this.declaringClassId = declaringClassId;
         this.name = name;
@@ -73,6 +94,7 @@ public final class MethodNode extends SymbolNode {
         this.annotations = annotations == null ? List.of() : List.copyOf(annotations);
         this.springMetadata = springMetadata == null ? new SpringMetadata() : springMetadata;
         this.guiceMetadata = guiceMetadata == null ? new GuiceMetadata() : guiceMetadata;
+        this.receiverType = receiverType == null ? "" : receiverType;
     }
 
     public String getDeclaringClassId() {
@@ -137,5 +159,9 @@ public final class MethodNode extends SymbolNode {
 
     public GuiceMetadata getGuiceMetadata() {
         return guiceMetadata;
+    }
+
+    public String getReceiverType() {
+        return receiverType;
     }
 }

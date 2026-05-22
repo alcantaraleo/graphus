@@ -34,6 +34,7 @@ public final class CrossLanguageCallResolver {
         Map<String, List<MethodNode>> kotlinIndex = indexMethodNodes(callGraph, kotlinMethodIds);
 
         int javaToKotlin = resolveAgainst(callGraph, javaUnresolvedRecords, kotlinIndex);
+        javaToKotlin += resolveExtensionsAgainst(callGraph, javaUnresolvedRecords, kotlinIndex);
         int kotlinToJava = resolveAgainst(callGraph, kotlinUnresolvedRecords, javaIndex);
 
         return new Result(javaToKotlin, kotlinToJava);
@@ -47,6 +48,41 @@ public final class CrossLanguageCallResolver {
         for (UnresolvedCallRecord record : records) {
             List<MethodNode> candidates = targetIndex.getOrDefault(record.calleeName(), List.of()).stream()
                     .filter(node -> KotlinCallGraphBuilder.arityOf(node.getSignature()) == record.arity())
+                    .toList();
+            if (candidates.size() != 1) {
+                continue;
+            }
+            String calleeId = candidates.get(0).getId();
+            callGraph.removeEdge(record.callerId(), record.unresolvedNodeId());
+            callGraph.removeNode(record.unresolvedNodeId());
+            callGraph.addEdge(record.callerId(), calleeId);
+            resolved++;
+        }
+        return resolved;
+    }
+
+    /**
+     * Secondary pass: resolves Java calls to Kotlin extension functions where the Java call
+     * arity is exactly one more than the Kotlin method arity (the extra argument is the
+     * extension receiver). Only processes records whose placeholder node still exists
+     * (i.e. not already resolved by the primary pass).
+     */
+    private static int resolveExtensionsAgainst(
+            CallGraph callGraph,
+            Collection<UnresolvedCallRecord> records,
+            Map<String, List<MethodNode>> kotlinIndex) {
+        int resolved = 0;
+        for (UnresolvedCallRecord record : records) {
+            if (callGraph.getNode(record.unresolvedNodeId()) == null) {
+                continue; // already resolved by the primary pass
+            }
+            if (record.arity() < 1) {
+                continue; // no room for a receiver argument
+            }
+            int extensionArity = record.arity() - 1;
+            List<MethodNode> candidates = kotlinIndex.getOrDefault(record.calleeName(), List.of()).stream()
+                    .filter(node -> !node.getReceiverType().isEmpty())
+                    .filter(node -> KotlinCallGraphBuilder.arityOf(node.getSignature()) == extensionArity)
                     .toList();
             if (candidates.size() != 1) {
                 continue;
