@@ -9,12 +9,16 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jetbrains.kotlin.psi.KtArrayAccessExpression;
 import org.jetbrains.kotlin.psi.KtBinaryExpression;
 import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
 import org.jetbrains.kotlin.psi.KtExpression;
+import org.jetbrains.kotlin.psi.KtFunctionType;
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
+import org.jetbrains.kotlin.psi.KtNamedFunction;
+import org.jetbrains.kotlin.psi.KtParameter;
 import org.jetbrains.kotlin.psi.KtPostfixExpression;
 import org.jetbrains.kotlin.psi.KtPrefixExpression;
 import org.jetbrains.kotlin.psi.KtUnaryExpression;
@@ -85,8 +89,11 @@ public final class KotlinCallGraphBuilder {
                     continue;
                 }
                 unresolvedCalls++;
+                Set<String> lambdaParams = functionTypeParameterNames(declaration);
+                boolean isLambdaInvocation = lambdaParams.contains(signature.name());
+                String tag = isLambdaInvocation ? "UNRESOLVED:LAMBDA:" : "UNRESOLVED:";
                 String unresolvedId =
-                        "UNRESOLVED:" + signature.name() + "/" + signature.arity() + "@" + callerId
+                        tag + signature.name() + "/" + signature.arity() + "@" + callerId
                                 + "#" + System.identityHashCode(call);
                 String filePath = relativeFilePathOf(declaration);
                 int line = lineOf(call);
@@ -348,6 +355,23 @@ public final class KotlinCallGraphBuilder {
             // PsiFiles created in memory (tests) do not back a real VirtualFile.
         }
         return declaration.getContainingKtFile().getName();
+    }
+
+    private static Set<String> functionTypeParameterNames(KtDeclarationWithBody declaration) {
+        if (!(declaration instanceof KtNamedFunction function)) {
+            return Set.of();
+        }
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (KtParameter parameter : function.getValueParameters()) {
+            if (parameter.getTypeReference() != null
+                    && parameter.getTypeReference().getTypeElement() instanceof KtFunctionType) {
+                String name = parameter.getName();
+                if (name != null && !name.isBlank()) {
+                    names.add(name);
+                }
+            }
+        }
+        return names;
     }
 
     private record CallSiteSignature(String name, int arity) {

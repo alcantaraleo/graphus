@@ -143,6 +143,26 @@ class KotlinCallGraphBuilderTest {
                 "Array access this[i, i] must resolve to operator fun get(Int, Int)");
     }
 
+    @Test
+    void lambdaParameterInvocationProducesTaggedUnresolvedNode(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Processor.kt",
+                """
+                package demo
+
+                fun process(handler: (String) -> String, input: String): String = handler(input)
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        // The call handler(input) should produce a tagged UNRESOLVED:LAMBDA: node.
+        boolean hasLambdaUnresolved = output.graph().getNodes().stream()
+                .anyMatch(node -> node.getId().startsWith("UNRESOLVED:LAMBDA:handler"));
+        assertTrue(hasLambdaUnresolved,
+                "Lambda parameter invocation must produce an UNRESOLVED:LAMBDA: tagged node");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 
