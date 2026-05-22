@@ -144,6 +144,30 @@ class KotlinCallGraphBuilderTest {
     }
 
     @Test
+    void resolvesArrayAccessSetOperatorAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Bag.kt",
+                """
+                package demo
+
+                class Bag {
+                    private val data = mutableMapOf<Int, Int>()
+                    operator fun get(i: Int): Int = data[i] ?: 0
+                    operator fun set(i: Int, v: Int) { data[i] = v }
+                    fun fill(i: Int) { this[i] = 42 }
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Bag.fill(Int)", "demo.Bag.set(Int, Int)")),
+                "Array write this[i] = 42 must resolve to operator fun set(Int, Int)");
+    }
+
+    @Test
     void lambdaParameterInvocationProducesTaggedUnresolvedNode(@TempDir Path tempDir) throws IOException {
         Path source = writeFile(
                 tempDir,

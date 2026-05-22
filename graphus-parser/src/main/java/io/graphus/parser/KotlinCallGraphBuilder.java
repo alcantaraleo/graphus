@@ -7,6 +7,7 @@ import io.graphus.model.UnresolvedNode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,6 +76,7 @@ public final class KotlinCallGraphBuilder {
             if (body == null) {
                 continue;
             }
+            Set<String> lambdaParams = functionTypeParameterNames(declaration);
             for (KtCallExpression call : findAllCallExpressions(body)) {
                 CallSiteSignature signature = signatureOf(call);
                 if (signature == null) {
@@ -89,7 +91,6 @@ public final class KotlinCallGraphBuilder {
                     continue;
                 }
                 unresolvedCalls++;
-                Set<String> lambdaParams = functionTypeParameterNames(declaration);
                 boolean isLambdaInvocation = lambdaParams.contains(signature.name());
                 String tag = isLambdaInvocation ? "UNRESOLVED:LAMBDA:" : "UNRESOLVED:";
                 String unresolvedId =
@@ -361,7 +362,7 @@ public final class KotlinCallGraphBuilder {
         if (!(declaration instanceof KtNamedFunction function)) {
             return Set.of();
         }
-        Set<String> names = new java.util.LinkedHashSet<>();
+        Set<String> names = new HashSet<>();
         for (KtParameter parameter : function.getValueParameters()) {
             if (parameter.getTypeReference() != null
                     && parameter.getTypeReference().getTypeElement() instanceof KtFunctionType) {
