@@ -157,6 +157,55 @@ class CrossLanguageCallResolverTest {
                 "Ambiguous match must leave the placeholder in place");
     }
 
+    @Test
+    void resolvesJavaToKotlinExtensionCallWithArityPlusOne() {
+        CallGraph graph = new CallGraph();
+        MethodNode caller = method("com.demo.JavaClient.use()", "use", "use()");
+        graph.addNode(caller);
+
+        // Kotlin extension: fun String.shout(): String — arity 0, receiverType "String"
+        MethodNode extension = new MethodNode(
+                "com.demo.StringExtKt.shout()",
+                SymbolKind.METHOD,
+                "com.demo.StringExtKt",
+                "shout",
+                "shout()",
+                "String",
+                List.<MethodParam>of(),
+                List.<String>of(),
+                List.<String>of(),
+                "StringExt.kt",
+                1,
+                new SpringMetadata(),
+                new GuiceMetadata(),
+                "String");
+        graph.addNode(extension);
+
+        // Java calls ExtensionsKt.shout(someStr) — arity 1 from Java's perspective.
+        UnresolvedNode unresolved =
+                new UnresolvedNode("UNRESOLVED:shout/1@javaClient", "shout(str)", "Java.java", 5);
+        graph.addNode(unresolved);
+        graph.addEdge(caller.getId(), unresolved.getId());
+
+        UnresolvedCallRecord record =
+                new UnresolvedCallRecord(caller.getId(), "shout", 1, unresolved.getId(),
+                        UnresolvedCallRecord.Origin.JAVA);
+
+        CrossLanguageCallResolver.Result result =
+                new CrossLanguageCallResolver().resolve(
+                        graph,
+                        Set.of(caller.getId()),
+                        Set.of(extension.getId()),
+                        List.of(record),
+                        List.of());
+
+        assertEquals(1, result.javaToKotlinResolved());
+        assertTrue(graph.getEdges().contains(new CallEdge(caller.getId(), extension.getId())),
+                "Java→Kotlin extension call must be resolved");
+        assertNull(graph.getNode(unresolved.getId()),
+                "Resolved placeholder must be removed");
+    }
+
     private static MethodNode method(String id, String name, String signature) {
         return new MethodNode(
                 id,
