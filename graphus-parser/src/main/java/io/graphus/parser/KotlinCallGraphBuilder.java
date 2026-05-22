@@ -9,8 +9,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
+import org.jetbrains.kotlin.psi.KtDotQualifiedExpression;
 import org.jetbrains.kotlin.psi.KtExpression;
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
 import org.jetbrains.kotlin.psi.KtValueArgument;
@@ -51,6 +53,19 @@ public final class KotlinCallGraphBuilder {
                 if (candidates.size() == 1) {
                     callGraph.addEdge(callerId, candidates.get(0).getId());
                     continue;
+                }
+                if (candidates.size() > 1) {
+                    String receiverText = receiverTextOf(call);
+                    if (!receiverText.isEmpty()) {
+                        List<MethodNode> narrowed = candidates.stream()
+                                .filter(node -> !node.getReceiverType().isEmpty()
+                                        && node.getReceiverType().endsWith(receiverText))
+                                .toList();
+                        if (narrowed.size() == 1) {
+                            callGraph.addEdge(callerId, narrowed.get(0).getId());
+                            continue;
+                        }
+                    }
                 }
                 unresolvedCalls++;
                 String unresolvedId =
@@ -176,6 +191,19 @@ public final class KotlinCallGraphBuilder {
             // PsiFiles created in memory (tests) do not back a real VirtualFile.
         }
         return declaration.getContainingKtFile().getName();
+    }
+
+    private static String receiverTextOf(KtCallExpression call) {
+        PsiElement parent = call.getParent();
+        if (!(parent instanceof KtDotQualifiedExpression dotQual)) {
+            return "";
+        }
+        KtExpression receiver = dotQual.getReceiverExpression();
+        if (receiver == null) {
+            return "";
+        }
+        String text = receiver.getText();
+        return text == null ? "" : text.trim();
     }
 
     private record CallSiteSignature(String name, int arity) {

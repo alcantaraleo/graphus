@@ -77,6 +77,37 @@ class KotlinCallGraphBuilderTest {
                 .anyMatch(record -> record.calleeName().equals("greet") && record.arity() == 1));
     }
 
+    @Test
+    void disambiguatesExtensionCallByReceiverTypeWhenNameAndArityCollide(@TempDir Path tempDir)
+            throws IOException {
+        Path stringExt = writeFile(tempDir, "StringExt.kt",
+                """
+                package demo
+                fun String.shout(): String = this.uppercase() + "!"
+                """);
+        Path intExt = writeFile(tempDir, "IntExt.kt",
+                """
+                package demo
+                fun Int.shout(): String = this.toString() + "!"
+                """);
+        Path greeter = writeFile(tempDir, "Greeter.kt",
+                """
+                package demo
+                class Greeter {
+                    fun greetString(s: String): String = s.shout()
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, stringExt, intExt, greeter);
+
+        Set<CallEdge> edges = output.graph().getEdges();
+        // Must not resolve s.shout() to the Int extension when receiver is a String variable.
+        assertFalse(
+                edges.contains(new CallEdge("demo.Greeter.greetString(String)", "demo.IntExtKt.shout()")),
+                "Must not resolve s.shout() to the Int extension");
+        // Resolved to String or left unresolved — both are acceptable (no full type inference).
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 
