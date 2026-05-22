@@ -77,6 +77,28 @@ class KotlinCallGraphBuilderTest {
                 .anyMatch(record -> record.calleeName().equals("greet") && record.arity() == 1));
     }
 
+    @Test
+    void resolvesBinaryOperatorOverloadAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Vector.kt",
+                """
+                package demo
+
+                data class Vector(val x: Int, val y: Int) {
+                    operator fun plus(other: Vector): Vector = Vector(x + other.x, y + other.y)
+                    fun combine(other: Vector): Vector = this + other
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Vector.combine(Vector)", "demo.Vector.plus(Vector)")),
+                "Binary '+' on Vector must resolve to operator fun plus(Vector)");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 

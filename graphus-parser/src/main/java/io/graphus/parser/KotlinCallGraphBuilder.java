@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.kotlin.psi.KtBinaryExpression;
 import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
 import org.jetbrains.kotlin.psi.KtExpression;
@@ -26,6 +27,25 @@ import org.jetbrains.kotlin.psi.KtValueArgument;
  * {@link CrossLanguageCallResolver} can attempt Kotlin→Java resolution in a later pass.
  */
 public final class KotlinCallGraphBuilder {
+
+    private static final Map<String, String> BINARY_OPERATOR_TO_METHOD = Map.ofEntries(
+            Map.entry("PLUS", "plus"),
+            Map.entry("MINUS", "minus"),
+            Map.entry("MUL", "times"),
+            Map.entry("DIV", "div"),
+            Map.entry("PERC", "rem"),
+            Map.entry("PLUSEQ", "plusAssign"),
+            Map.entry("MINUSEQ", "minusAssign"),
+            Map.entry("MULTEQ", "timesAssign"),
+            Map.entry("DIVEQ", "divAssign"),
+            Map.entry("PERCEQ", "remAssign"),
+            Map.entry("EQEQ", "equals"),
+            Map.entry("LT", "compareTo"),
+            Map.entry("GT", "compareTo"),
+            Map.entry("LTEQ", "compareTo"),
+            Map.entry("GTEQ", "compareTo"),
+            Map.entry("RANGE", "rangeTo")
+    );
 
     public BuildResult buildEdges(CallGraph callGraph, KotlinParserContext context) {
         Map<String, List<MethodNode>> kotlinMethodsByName = indexKotlinMethods(callGraph, context);
@@ -67,6 +87,30 @@ public final class KotlinCallGraphBuilder {
                         unresolvedId,
                         UnresolvedCallRecord.Origin.KOTLIN));
             }
+            for (KtBinaryExpression binary : findAllBinaryExpressions(body)) {
+                String tokenName = binary.getOperationToken().toString();
+                String methodName = BINARY_OPERATOR_TO_METHOD.get(tokenName);
+                if (methodName == null) {
+                    continue;
+                }
+                // Binary operators always take one argument (the right-hand side).
+                List<MethodNode> candidates = kotlinMethodsByName.getOrDefault(methodName, List.of()).stream()
+                        .filter(node -> arityOf(node.getSignature()) == 1)
+                        .toList();
+                if (candidates.size() == 1) {
+                    callGraph.addEdge(callerId, candidates.get(0).getId());
+                } else if (!candidates.isEmpty()) {
+                    unresolvedCalls++;
+                    String unresolvedId = "UNRESOLVED:OP:" + methodName + "/1@" + callerId
+                            + "#" + System.identityHashCode(binary);
+                    String filePath = relativeFilePathOf(declaration);
+                    int line = lineOf(binary);
+                    callGraph.addNode(new UnresolvedNode(unresolvedId, binary.getText(), filePath, line));
+                    callGraph.addEdge(callerId, unresolvedId);
+                    records.add(new UnresolvedCallRecord(callerId, methodName, 1, unresolvedId,
+                            UnresolvedCallRecord.Origin.KOTLIN));
+                }
+            }
         }
 
         return new BuildResult(unresolvedCalls, List.copyOf(records));
@@ -93,6 +137,17 @@ public final class KotlinCallGraphBuilder {
                 .findChildrenOfType(root, KtCallExpression.class)
                 .forEach(calls::add);
         return calls;
+    }
+
+    private static List<KtBinaryExpression> findAllBinaryExpressions(KtExpression root) {
+        List<KtBinaryExpression> result = new ArrayList<>();
+        if (root instanceof KtBinaryExpression rootBin) {
+            result.add(rootBin);
+        }
+        org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
+                .findChildrenOfType(root, KtBinaryExpression.class)
+                .forEach(result::add);
+        return result;
     }
 
     private static CallSiteSignature signatureOf(KtCallExpression call) {
@@ -153,14 +208,14 @@ public final class KotlinCallGraphBuilder {
         return count;
     }
 
-    private static int lineOf(KtCallExpression call) {
+    private static int lineOf(org.jetbrains.kotlin.psi.KtElement element) {
         org.jetbrains.kotlin.com.intellij.openapi.editor.Document document =
-                org.jetbrains.kotlin.com.intellij.psi.PsiDocumentManager.getInstance(call.getProject())
-                        .getDocument(call.getContainingKtFile());
-        if (document == null || call.getTextRange() == null) {
+                org.jetbrains.kotlin.com.intellij.psi.PsiDocumentManager.getInstance(element.getProject())
+                        .getDocument(element.getContainingKtFile());
+        if (document == null || element.getTextRange() == null) {
             return -1;
         }
-        return document.getLineNumber(call.getTextRange().getStartOffset()) + 1;
+        return document.getLineNumber(element.getTextRange().getStartOffset()) + 1;
     }
 
     private static String relativeFilePathOf(KtDeclarationWithBody declaration) {
