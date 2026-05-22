@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/alcantaraleo/graphus/compare/v0.8.0...v0.9.0) (2026-05-22)
+
+
+### Features
+
+* **parser:** Kotlin extension function call edges ([#79](https://github.com/alcantaraleo/graphus/issues/79)) ([642bd74](https://github.com/alcantaraleo/graphus/commit/642bd7476318a56561d776e9d2641a1b17067926))
+* **parser:** resolve Kotlin operator overloads and tag lambda invocations as call edges ([#80](https://github.com/alcantaraleo/graphus/issues/80)) ([931a9cf](https://github.com/alcantaraleo/graphus/commit/931a9cf0a65efc2e361900fc6aa0331dffe2b523))
+
+
+### Bug Fixes
+
+* **parser:** support Groovy quoted-string include syntax in GradleSettingsParser ([#78](https://github.com/alcantaraleo/graphus/issues/78)) ([e05c4da](https://github.com/alcantaraleo/graphus/commit/e05c4da986c5ea336a13e22248dc9d75fc515c46))
+
 ## [0.8.0](https://github.com/alcantaraleo/graphus/compare/v0.7.0...v0.8.0) (2026-05-21)
 
 
