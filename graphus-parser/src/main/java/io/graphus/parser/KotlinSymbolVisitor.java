@@ -186,6 +186,14 @@ public final class KotlinSymbolVisitor {
         SpringMetadata springMetadata = annotationExtractor.extractSpring(annotations);
         GuiceMetadata guiceMetadata = annotationExtractor.extractGuice(annotations, InjectionType.METHOD);
 
+        String receiverType = "";
+        if (function.getReceiverTypeReference() != null) {
+            String text = function.getReceiverTypeReference().getText();
+            if (text != null) {
+                receiverType = text;
+            }
+        }
+
         MethodNode methodNode = new MethodNode(
                 methodId,
                 SymbolKind.METHOD,
@@ -199,7 +207,8 @@ public final class KotlinSymbolVisitor {
                 filePath,
                 lineOf(function),
                 springMetadata,
-                guiceMetadata);
+                guiceMetadata,
+                receiverType);
         context.callGraph().addNode(methodNode);
         context.registerCallable(function, methodId);
         owner.addMethod(methodId);
