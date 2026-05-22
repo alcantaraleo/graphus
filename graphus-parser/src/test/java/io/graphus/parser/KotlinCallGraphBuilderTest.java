@@ -78,6 +78,116 @@ class KotlinCallGraphBuilderTest {
     }
 
     @Test
+    void resolvesBinaryOperatorOverloadAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Vector.kt",
+                """
+                package demo
+
+                data class Vector(val x: Int, val y: Int) {
+                    operator fun plus(other: Vector): Vector = Vector(x + other.x, y + other.y)
+                    fun combine(other: Vector): Vector = this + other
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Vector.combine(Vector)", "demo.Vector.plus(Vector)")),
+                "Binary '+' on Vector must resolve to operator fun plus(Vector)");
+    }
+
+    @Test
+    void resolvesUnaryOperatorOverloadAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Counter.kt",
+                """
+                package demo
+
+                class Counter(var value: Int) {
+                    operator fun inc(): Counter = Counter(value + 1)
+                    fun step(): Counter { var c = this; return ++c }
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Counter.step()", "demo.Counter.inc()")),
+                "Prefix '++' must resolve to operator fun inc()");
+    }
+
+    @Test
+    void resolvesArrayAccessGetOperatorAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Grid.kt",
+                """
+                package demo
+
+                class Grid {
+                    operator fun get(row: Int, col: Int): Int = row * 10 + col
+                    fun diagonal(i: Int): Int = this[i, i]
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Grid.diagonal(Int)", "demo.Grid.get(Int, Int)")),
+                "Array access this[i, i] must resolve to operator fun get(Int, Int)");
+    }
+
+    @Test
+    void resolvesArrayAccessSetOperatorAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Bag.kt",
+                """
+                package demo
+
+                class Bag {
+                    private val data = mutableMapOf<Int, Int>()
+                    operator fun get(i: Int): Int = data[i] ?: 0
+                    operator fun set(i: Int, v: Int) { data[i] = v }
+                    fun fill(i: Int) { this[i] = 42 }
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Bag.fill(Int)", "demo.Bag.set(Int, Int)")),
+                "Array write this[i] = 42 must resolve to operator fun set(Int, Int)");
+    }
+
+    @Test
+    void lambdaParameterInvocationProducesTaggedUnresolvedNode(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Processor.kt",
+                """
+                package demo
+
+                fun process(handler: (String) -> String, input: String): String = handler(input)
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        // The call handler(input) should produce a tagged UNRESOLVED:LAMBDA: node.
+        boolean hasLambdaUnresolved = output.graph().getNodes().stream()
+                .anyMatch(node -> node.getId().startsWith("UNRESOLVED:LAMBDA:handler"));
+        assertTrue(hasLambdaUnresolved,
+                "Lambda parameter invocation must produce an UNRESOLVED:LAMBDA: tagged node");
+    }
+
+    @Test
     void disambiguatesExtensionCallByReceiverTypeWhenNameAndArityCollide(@TempDir Path tempDir)
             throws IOException {
         Path stringExt = writeFile(tempDir, "StringExt.kt",
