@@ -121,6 +121,28 @@ class KotlinCallGraphBuilderTest {
                 "Prefix '++' must resolve to operator fun inc()");
     }
 
+    @Test
+    void resolvesArrayAccessGetOperatorAsCallEdge(@TempDir Path tempDir) throws IOException {
+        Path source = writeFile(
+                tempDir,
+                "Grid.kt",
+                """
+                package demo
+
+                class Grid {
+                    operator fun get(row: Int, col: Int): Int = row * 10 + col
+                    fun diagonal(i: Int): Int = this[i, i]
+                }
+                """);
+
+        BuildOutput output = parseAndBuild(tempDir, source);
+
+        assertTrue(
+                output.graph().getEdges().contains(
+                        new CallEdge("demo.Grid.diagonal(Int)", "demo.Grid.get(Int, Int)")),
+                "Array access this[i, i] must resolve to operator fun get(Int, Int)");
+    }
+
     private record BuildOutput(CallGraph graph, KotlinCallGraphBuilder.BuildResult result) {
     }
 

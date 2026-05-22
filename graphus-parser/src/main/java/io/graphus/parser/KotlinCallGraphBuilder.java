@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.kotlin.psi.KtArrayAccessExpression;
 import org.jetbrains.kotlin.psi.KtBinaryExpression;
 import org.jetbrains.kotlin.psi.KtCallExpression;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
@@ -136,6 +137,28 @@ public final class KotlinCallGraphBuilder {
                 unresolvedCalls += resolveUnaryOperator(callGraph, callerId, declaration, postfix,
                         methodName, kotlinMethodsByName, records);
             }
+            for (KtArrayAccessExpression arrayAccess : findAllArrayAccesses(body)) {
+                int indexCount = arrayAccess.getIndexExpressions().size();
+                boolean isWrite = isLhsOfAssignment(arrayAccess);
+                String methodName = isWrite ? "set" : "get";
+                int arity = isWrite ? indexCount + 1 : indexCount;
+                List<MethodNode> candidates = kotlinMethodsByName.getOrDefault(methodName, List.of()).stream()
+                        .filter(node -> arityOf(node.getSignature()) == arity)
+                        .toList();
+                if (candidates.size() == 1) {
+                    callGraph.addEdge(callerId, candidates.get(0).getId());
+                } else if (!candidates.isEmpty()) {
+                    unresolvedCalls++;
+                    String unresolvedId = "UNRESOLVED:OP:" + methodName + "/" + arity + "@" + callerId
+                            + "#" + System.identityHashCode(arrayAccess);
+                    callGraph.addNode(new UnresolvedNode(
+                            unresolvedId, arrayAccess.getText(),
+                            relativeFilePathOf(declaration), lineOf(arrayAccess)));
+                    callGraph.addEdge(callerId, unresolvedId);
+                    records.add(new UnresolvedCallRecord(callerId, methodName, arity, unresolvedId,
+                            UnresolvedCallRecord.Origin.KOTLIN));
+                }
+            }
         }
 
         return new BuildResult(unresolvedCalls, List.copyOf(records));
@@ -195,6 +218,26 @@ public final class KotlinCallGraphBuilder {
                 .findChildrenOfType(root, KtPostfixExpression.class)
                 .forEach(result::add);
         return result;
+    }
+
+    private static List<KtArrayAccessExpression> findAllArrayAccesses(KtExpression root) {
+        List<KtArrayAccessExpression> result = new ArrayList<>();
+        if (root instanceof KtArrayAccessExpression r) {
+            result.add(r);
+        }
+        org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
+                .findChildrenOfType(root, KtArrayAccessExpression.class)
+                .forEach(result::add);
+        return result;
+    }
+
+    private static boolean isLhsOfAssignment(KtArrayAccessExpression arrayAccess) {
+        org.jetbrains.kotlin.com.intellij.psi.PsiElement parent = arrayAccess.getParent();
+        if (!(parent instanceof KtBinaryExpression binary)) {
+            return false;
+        }
+        return "EQ".equals(binary.getOperationToken().toString())
+                && binary.getLeft() == arrayAccess;
     }
 
     private static int resolveUnaryOperator(
