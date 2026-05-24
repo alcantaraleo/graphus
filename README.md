@@ -246,6 +246,12 @@ For manual setup, add to your MCP client settings:
 
 Available tools: `graphus_search`, `graphus_blast_radius`, `graphus_callers`, `graphus_callees`, `graphus_module_deps`, `graphus_hotspots`, `graphus_ownership`.
 
+## Documentation
+
+- [CI/CD Integration](docs/ci-cd-integration.md) — keep the index fresh automatically with GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins, and CircleCI
+- [Architecture](docs/architecture.md) — full class breakdown and data flow
+- [Conventions](docs/conventions.md) — coding and contribution conventions
+
 ## Known Limitations
 
 - Spring runtime dispatch (AOP/proxies) cannot be fully represented by static call edges.
