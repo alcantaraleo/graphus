@@ -9,6 +9,6 @@ dependencies {
     // KtCallExpression, KtAnnotationEntry). Pinned during the P0 spike: kotlinx-ast was
     // rejected because (a) it is JitPack-only and (b) its KlassDeclaration model does not
     // expose call expressions inside function bodies, which the Kotlin call-graph builder needs.
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.21")
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.3.21")
     implementation("org.slf4j:slf4j-api:2.0.17")
 }
