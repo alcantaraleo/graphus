@@ -1,6 +1,5 @@
 package io.graphus.cli.mcp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.graphus.cli.mcp.tools.BlastRadiusTool;
 import io.graphus.cli.mcp.tools.CalleesTool;
 import io.graphus.cli.mcp.tools.CallersTool;
@@ -8,6 +7,8 @@ import io.graphus.cli.mcp.tools.HotspotsTool;
 import io.graphus.cli.mcp.tools.ModuleDepsTool;
 import io.graphus.cli.mcp.tools.OwnershipTool;
 import io.graphus.cli.mcp.tools.SearchTool;
+import io.modelcontextprotocol.json.McpJsonDefaults;
+import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
@@ -22,7 +23,8 @@ public final class GraphusMcpServer {
     }
 
     public McpSyncServer build(String version) {
-        StdioServerTransportProvider transport = new StdioServerTransportProvider(new ObjectMapper());
+        McpJsonMapper mapper = McpJsonDefaults.getMapper();
+        StdioServerTransportProvider transport = new StdioServerTransportProvider(mapper);
 
         ServerCapabilities capabilities = new ServerCapabilities.Builder()
                 .tools(Boolean.TRUE)

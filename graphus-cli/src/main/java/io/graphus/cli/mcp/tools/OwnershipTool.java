@@ -20,13 +20,15 @@ public final class OwnershipTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_ownership",
-                "Return file ownership (primary author per file) from git-analyze output. Requires 'graphus git-analyze' to have been run first.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_ownership")
+                .description("Return file ownership (primary author per file) from git-analyze output. Requires 'graphus git-analyze' to have been run first.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
+                Map<String, Object> args = request.arguments();
                 Path ownershipFile = ctx.stateDir().resolve("ownership.json");
                 if (!Files.exists(ownershipFile)) {
                     String error = ctx.objectMapper()
@@ -38,11 +40,12 @@ public final class OwnershipTool {
                             .build();
                 }
 
+                byte[] data = Files.readAllBytes(ownershipFile);
                 @SuppressWarnings("unchecked")
                 Map<String, String> ownership = ctx.objectMapper()
-                        .readValue(ownershipFile.toFile(), Map.class);
+                        .readValue(data, Map.class);
 
-                String pathFilter = (String) arguments.get("path");
+                String pathFilter = (String) args.get("path");
                 if (pathFilter != null && !pathFilter.isBlank()) {
                     ownership = ownership.entrySet().stream()
                             .filter(e -> e.getKey().contains(pathFilter))

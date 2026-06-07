@@ -1,9 +1,11 @@
 package io.graphus.cli.mcp.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.graphus.cli.mcp.GraphusMcpContext;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,6 +24,7 @@ class OwnershipToolTest {
     void spec_hasCorrectToolName() {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.stateDir()).thenReturn(Path.of("/tmp/no-such-state-" + System.nanoTime()));
 
         OwnershipTool tool = new OwnershipTool(ctx);
@@ -33,10 +36,11 @@ class OwnershipToolTest {
     void callHandler_returnsIsError_whenOwnershipJsonMissing(@TempDir Path tempDir) {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.stateDir()).thenReturn(tempDir);
 
         OwnershipTool tool = new OwnershipTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of());
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of()));
 
         assertTrue(Boolean.TRUE.equals(result.isError()));
         String text = ((TextContent) result.content().get(0)).text();
@@ -54,10 +58,11 @@ class OwnershipToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(mapper);
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.stateDir()).thenReturn(tempDir);
 
         OwnershipTool tool = new OwnershipTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of());
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of()));
 
         assertTrue(Boolean.FALSE.equals(result.isError()) || result.isError() == null);
         String json = ((TextContent) result.content().get(0)).text();
@@ -76,10 +81,11 @@ class OwnershipToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(mapper);
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.stateDir()).thenReturn(tempDir);
 
         OwnershipTool tool = new OwnershipTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of("path", "cli"));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("path", "cli")));
 
         assertTrue(Boolean.FALSE.equals(result.isError()) || result.isError() == null);
         String json = ((TextContent) result.content().get(0)).text();
