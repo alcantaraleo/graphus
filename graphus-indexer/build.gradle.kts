@@ -4,9 +4,9 @@ plugins {
 
 dependencies {
     implementation(project(":graphus-model"))
-    implementation("dev.langchain4j:langchain4j-core:1.14.0")
+    implementation("dev.langchain4j:langchain4j-core:1.15.0")
     implementation("dev.langchain4j:langchain4j-chroma:1.15.0-beta25")
-    implementation("dev.langchain4j:langchain4j-open-ai:1.14.0")
+    implementation("dev.langchain4j:langchain4j-open-ai:1.15.0")
     implementation("dev.langchain4j:langchain4j-embeddings-all-minilm-l6-v2:1.15.0-beta25")
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.3")
