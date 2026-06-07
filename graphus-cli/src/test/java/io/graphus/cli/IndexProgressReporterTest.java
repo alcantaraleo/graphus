@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.langchain4j.data.document.Metadata;
 import io.graphus.indexer.IndexProgressListener;
 import io.graphus.indexer.SymbolChunk;
-import java.util.Map;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class IndexProgressReporterTest {
@@ -17,11 +17,12 @@ class IndexProgressReporterTest {
     void onSymbolStartWritesNothingWhenTotalIsZero() {
         IndexProgressListener reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream originalErr = System.err;
         System.setErr(new PrintStream(captured));
         try {
             reporter.onSymbolStart(makeChunk("test.txt"), 0, 0);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertEquals(0, captured.size());
     }
@@ -30,12 +31,12 @@ class IndexProgressReporterTest {
     void onSymbolStartProducesOutputOnStderr() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onSymbolStart(makeChunk("com/example/Symbol.java"), 1, 2);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -44,12 +45,12 @@ class IndexProgressReporterTest {
     void onSymbolStartHandlesCurrentEqualToTotal() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onSymbolStart(makeChunk("com/example/Symbol.java"), 5, 5);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -58,12 +59,12 @@ class IndexProgressReporterTest {
     void onSymbolStartClampsCurrentBounded() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onSymbolStart(makeChunk("com/example/Symbol.java"), 999, 10);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -72,13 +73,13 @@ class IndexProgressReporterTest {
     void completePrintsNewlineAfterProgress() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onSymbolStart(makeChunk("com/example/Symbol.java"), 1, 2);
             reporter.complete();
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         String output = captured.toString();
         assertTrue(output.contains("\r"), "Should contain carriage return for in-place overwrite");
@@ -88,12 +89,12 @@ class IndexProgressReporterTest {
     void completeDoesNothingWhenNoProgressShown() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.complete();
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertEquals(0, captured.size(), "complete() with no prior progress should produce no output");
     }
@@ -102,8 +103,8 @@ class IndexProgressReporterTest {
     void resolveTargetUsesFileMetadata() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             SymbolChunk chunk = new SymbolChunk(
                     "com.example.MyClass#method()",
@@ -111,7 +112,7 @@ class IndexProgressReporterTest {
                     new Metadata(Map.of("file", "src/main/java/com/example/MyClass.java")));
             reporter.onSymbolStart(chunk, 1, 1);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         String output = captured.toString();
         assertTrue(output.contains("src/main/java/com/example/MyClass.java"),
@@ -122,8 +123,8 @@ class IndexProgressReporterTest {
     void resolveTargetFallsBackToSymbolId() {
         IndexProgressReporter reporter = new IndexProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             SymbolChunk chunk = new SymbolChunk(
                     "com.example.MyClass#method()",
@@ -131,7 +132,7 @@ class IndexProgressReporterTest {
                     new Metadata());
             reporter.onSymbolStart(chunk, 1, 1);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         String output = captured.toString();
         assertTrue(output.contains("com.example.MyClass#method()"),

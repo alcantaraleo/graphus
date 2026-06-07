@@ -14,11 +14,12 @@ class ParserProgressReporterTest {
     void onFileStartWritesNothingWhenTotalIsZero() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream originalErr = System.err;
         System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("Test.java"), 0, 0);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertEquals(0, captured.size());
     }
@@ -27,12 +28,12 @@ class ParserProgressReporterTest {
     void onFileStartProducesOutputOnStderr() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("com/example/Foo.java"), 1, 2);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -41,12 +42,12 @@ class ParserProgressReporterTest {
     void onFileStartHandlesCurrentEqualToTotal() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("com/example/Foo.java"), 5, 5);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -55,12 +56,12 @@ class ParserProgressReporterTest {
     void onFileStartClampsCurrentBounded() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("com/example/Foo.java"), 999, 10);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertTrue(captured.size() > 0);
     }
@@ -69,13 +70,13 @@ class ParserProgressReporterTest {
     void completePrintsNewlineAfterProgress() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("com/example/Foo.java"), 1, 2);
             reporter.complete();
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         String output = captured.toString();
         assertTrue(output.contains("\r"), "Should contain carriage return for in-place overwrite");
@@ -85,12 +86,12 @@ class ParserProgressReporterTest {
     void completeDoesNothingWhenNoProgressShown() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.complete();
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
         assertEquals(0, captured.size(), "complete() with no prior progress should produce no output");
     }
@@ -99,8 +100,8 @@ class ParserProgressReporterTest {
     void onFileStartIsIdempotentWithPadding() {
         var reporter = new ParserProgressReporter();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        var errStream = new PrintStream(captured);
-        System.setErr(errStream);
+        PrintStream originalErr = System.err;
+        System.setErr(new PrintStream(captured));
         try {
             reporter.onFileStart(FileSystems.getDefault().getPath("com/example/Foo.java"), 1, 10);
             int firstLength = captured.size();
@@ -108,7 +109,7 @@ class ParserProgressReporterTest {
             int secondLength = captured.size();
             assertTrue(secondLength >= firstLength);
         } finally {
-            System.setErr(System.err);
+            System.setErr(originalErr);
         }
     }
 }
