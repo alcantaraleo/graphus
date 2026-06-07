@@ -30,17 +30,19 @@ public final class SearchTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_search",
-                "Search indexed code symbols by natural language query. Returns matching symbols with score, text, and metadata.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_search")
+                .description("Search indexed code symbols by natural language query. Returns matching symbols with score, text, and metadata.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
-                String query = (String) arguments.get("query");
-                int topK = arguments.containsKey("top_k")
-                        ? ((Number) arguments.get("top_k")).intValue() : 10;
-                String module = (String) arguments.get("module");
+                Map<String, Object> args = request.arguments();
+                String query = (String) args.get("query");
+                int topK = args.containsKey("top_k")
+                        ? ((Number) args.get("top_k")).intValue() : 10;
+                String module = (String) args.get("module");
 
                 List<GraphSearchHit> hits = ctx.graphIndexer().query(query, module, topK);
                 List<Map<String, Object>> payload = hits.stream()

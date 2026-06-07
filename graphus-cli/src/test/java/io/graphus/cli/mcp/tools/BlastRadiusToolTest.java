@@ -1,11 +1,13 @@
 package io.graphus.cli.mcp.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.graphus.cli.mcp.GraphusMcpContext;
 import io.graphus.model.CallGraph;
 import io.graphus.model.MethodNode;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +24,7 @@ class BlastRadiusToolTest {
     void spec_hasCorrectToolName() {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         BlastRadiusTool tool = new BlastRadiusTool(ctx);
         SyncToolSpecification spec = tool.spec();
         assertEquals("graphus_blast_radius", spec.tool().name());
@@ -62,11 +65,11 @@ class BlastRadiusToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(callGraph);
 
         BlastRadiusTool tool = new BlastRadiusTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null,
-                Map.of("symbol", "com.example.Service.process()"));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("symbol", "com.example.Service.process()")));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();
@@ -80,11 +83,11 @@ class BlastRadiusToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(callGraph);
 
         BlastRadiusTool tool = new BlastRadiusTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null,
-                Map.of("symbol", "com.example.Unknown.missing()"));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("symbol", "com.example.Unknown.missing()")));
 
         assertTrue(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();

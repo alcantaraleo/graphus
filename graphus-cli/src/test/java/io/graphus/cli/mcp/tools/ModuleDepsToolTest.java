@@ -1,11 +1,13 @@
 package io.graphus.cli.mcp.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.graphus.cli.mcp.GraphusMcpContext;
 import io.graphus.model.CallGraph;
 import io.graphus.model.ModuleNode;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ class ModuleDepsToolTest {
     void spec_hasCorrectToolName() {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         ModuleDepsTool tool = new ModuleDepsTool(ctx);
         SyncToolSpecification spec = tool.spec();
         assertEquals("graphus_module_deps", spec.tool().name());
@@ -37,10 +40,11 @@ class ModuleDepsToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(callGraph);
 
         ModuleDepsTool tool = new ModuleDepsTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of());
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of()));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();
@@ -59,10 +63,11 @@ class ModuleDepsToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(callGraph);
 
         ModuleDepsTool tool = new ModuleDepsTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of("module", "graphus-cli"));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("module", "graphus-cli")));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();

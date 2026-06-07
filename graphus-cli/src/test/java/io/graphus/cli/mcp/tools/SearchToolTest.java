@@ -1,6 +1,7 @@
 package io.graphus.cli.mcp.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.graphus.cli.mcp.GraphusMcpContext;
 import io.graphus.indexer.GraphIndexer;
 import io.graphus.indexer.GraphSearchHit;
@@ -23,6 +24,7 @@ class SearchToolTest {
     void spec_hasCorrectToolName() {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         SearchTool tool = new SearchTool(ctx);
         SyncToolSpecification spec = tool.spec();
         assertEquals("graphus_search", spec.tool().name());
@@ -34,13 +36,14 @@ class SearchToolTest {
         GraphIndexer indexer = mock(GraphIndexer.class);
         when(ctx.graphIndexer()).thenReturn(indexer);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(indexer.query("find payment service", null, 10))
                 .thenReturn(List.of(new GraphSearchHit(0.92, "PaymentService.process()", Map.of("kind", "METHOD"))));
 
         SearchTool tool = new SearchTool(ctx);
         CallToolRequest request = new CallToolRequest("graphus_search",
                 Map.of("query", "find payment service"));
-        CallToolResult result = tool.spec().call().apply(null, request.arguments());
+        CallToolResult result = tool.spec().callHandler().apply(null, request);
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();

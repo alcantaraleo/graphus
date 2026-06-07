@@ -13,6 +13,8 @@ import io.graphus.model.CallGraph;
 import io.graphus.model.WorkspaceDescriptor;
 import io.graphus.parser.ProjectParser;
 import io.graphus.parser.ProjectParserResult;
+import io.modelcontextprotocol.json.McpJsonDefaults;
+import io.modelcontextprotocol.json.McpJsonMapper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -24,18 +26,21 @@ public final class GraphusMcpContext {
     private final Path stateDir;
     private final Path repoRoot;
     private final ObjectMapper objectMapper;
+    private final McpJsonMapper jsonMapper;
 
     private GraphusMcpContext(
             CallGraph callGraph,
             GraphIndexer graphIndexer,
             Path stateDir,
             Path repoRoot,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            McpJsonMapper jsonMapper) {
         this.callGraph = callGraph;
         this.graphIndexer = graphIndexer;
         this.stateDir = stateDir;
         this.repoRoot = repoRoot;
         this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     public static GraphusMcpContext load(
@@ -83,12 +88,15 @@ public final class GraphusMcpContext {
 
         System.err.println("[graphus-mcp] Ready. CallGraph nodes=" + result.callGraph().getNodes().size());
 
+        McpJsonMapper jsonMapper = McpJsonDefaults.getMapper();
+
         return new GraphusMcpContext(
                 result.callGraph(),
                 graphIndexer,
                 normalizedState,
                 normalizedRepo,
-                new ObjectMapper());
+                new ObjectMapper(),
+                jsonMapper);
     }
 
     public CallGraph callGraph() { return callGraph; }
@@ -96,6 +104,7 @@ public final class GraphusMcpContext {
     public Path stateDir() { return stateDir; }
     public Path repoRoot() { return repoRoot; }
     public ObjectMapper objectMapper() { return objectMapper; }
+    public McpJsonMapper jsonMapper() { return jsonMapper; }
 
     private static EmbeddingBackend parseEmbeddingBackend(String value) {
         String normalized = value == null ? "local" : value.toLowerCase(Locale.ROOT);
