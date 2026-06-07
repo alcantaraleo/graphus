@@ -31,13 +31,13 @@ public final class ParserProgressReporter implements ParseProgressListener {
         int paddingLength = Math.max(0, previousLineLength - line.length());
         String padding = " ".repeat(paddingLength);
 
-        System.out.print("\r" + line + padding);
+        System.err.print("\r" + line + padding);
         previousLineLength = line.length();
     }
 
     public void complete() {
         if (previousLineLength > 0) {
-            System.out.println();
+            System.err.println();
         }
     }
 }
