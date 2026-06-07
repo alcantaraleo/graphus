@@ -1,11 +1,13 @@
 package io.graphus.cli.mcp.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.graphus.cli.mcp.GraphusMcpContext;
 import io.graphus.model.CallGraph;
 import io.graphus.model.MethodNode;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Path;
 import java.util.List;
@@ -24,6 +26,7 @@ class HotspotsToolTest {
     void spec_hasCorrectToolName() {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(new CallGraph());
         when(ctx.repoRoot()).thenReturn(Path.of("/tmp/no-such-repo-" + System.nanoTime()));
 
@@ -36,11 +39,12 @@ class HotspotsToolTest {
     void callHandler_returnsEmptyArray_whenRepoRootHasNoGitHistory(@TempDir Path tempDir) {
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(new CallGraph());
         when(ctx.repoRoot()).thenReturn(tempDir);
 
         HotspotsTool tool = new HotspotsTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of());
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of()));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();
@@ -53,11 +57,12 @@ class HotspotsToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(new CallGraph());
         when(ctx.repoRoot()).thenReturn(noSuchRepo);
 
         HotspotsTool tool = new HotspotsTool(ctx);
-        CallToolResult result = tool.spec().call().apply(null, Map.of("since_days", 30, "top", 10));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("since_days", 30, "top", 10)));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();
@@ -101,12 +106,13 @@ class HotspotsToolTest {
 
         GraphusMcpContext ctx = mock(GraphusMcpContext.class);
         when(ctx.objectMapper()).thenReturn(new ObjectMapper());
+        when(ctx.jsonMapper()).thenReturn(McpJsonDefaults.getMapper());
         when(ctx.callGraph()).thenReturn(callGraph);
         when(ctx.repoRoot()).thenReturn(tempDir);
 
         HotspotsTool tool = new HotspotsTool(ctx);
         // since_days=0 means all history; tempDir has no git, so churn=0 but coupling exists
-        CallToolResult result = tool.spec().call().apply(null, Map.of("since_days", 0, "top", 20));
+        CallToolResult result = tool.spec().callHandler().apply(null, new CallToolRequest("unknown", Map.of("since_days", 0, "top", 20)));
 
         assertFalse(Boolean.TRUE.equals(result.isError()));
         String json = ((TextContent) result.content().get(0)).text();

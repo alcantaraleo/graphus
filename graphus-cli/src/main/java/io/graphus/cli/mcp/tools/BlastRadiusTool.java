@@ -22,16 +22,18 @@ public final class BlastRadiusTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_blast_radius",
-                "Find all callers of a symbol via BFS traversal of the call graph.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_blast_radius")
+                .description("Find all callers of a symbol via BFS traversal of the call graph.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
-                String symbolInput = (String) arguments.get("symbol");
-                int depth = arguments.containsKey("depth")
-                        ? ((Number) arguments.get("depth")).intValue() : 3;
+                Map<String, Object> args = request.arguments();
+                String symbolInput = (String) args.get("symbol");
+                int depth = args.containsKey("depth")
+                        ? ((Number) args.get("depth")).intValue() : 3;
 
                 CallGraph callGraph = ctx.callGraph();
 

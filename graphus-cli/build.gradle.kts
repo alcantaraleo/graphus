@@ -38,11 +38,11 @@ dependencies {
     implementation(project(":graphus-model"))
     implementation(project(":graphus-parser"))
     implementation(project(":graphus-indexer"))
-    implementation("dev.langchain4j:langchain4j-core:1.14.0")
+    implementation("dev.langchain4j:langchain4j-core:1.15.0")
     implementation("info.picocli:picocli:4.7.7")
     annotationProcessor("info.picocli:picocli-codegen:4.7.7")
-    implementation("org.slf4j:slf4j-simple:2.0.17")
-    implementation("io.modelcontextprotocol.sdk:mcp:0.10.0")
+    implementation("org.slf4j:slf4j-simple:2.0.18")
+    implementation("io.modelcontextprotocol.sdk:mcp:1.1.3")
     testImplementation("org.mockito:mockito-core:5.14.2")
 }
 

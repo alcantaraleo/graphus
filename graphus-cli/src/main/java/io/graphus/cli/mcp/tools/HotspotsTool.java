@@ -30,18 +30,20 @@ public final class HotspotsTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_hotspots",
-                "Rank files by churn × coupling (git commit frequency × distinct callers). High scores = riskiest files to touch.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_hotspots")
+                .description("Rank files by churn × coupling (git commit frequency × distinct callers). High scores = riskiest files to touch.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
-                int sinceDays = arguments.containsKey("since_days")
-                        ? ((Number) arguments.get("since_days")).intValue()
+                Map<String, Object> args = request.arguments();
+                int sinceDays = args.containsKey("since_days")
+                        ? ((Number) args.get("since_days")).intValue()
                         : 365;
-                int top = arguments.containsKey("top")
-                        ? ((Number) arguments.get("top")).intValue()
+                int top = args.containsKey("top")
+                        ? ((Number) args.get("top")).intValue()
                         : 20;
 
                 Map<String, Integer> churn = computeChurn(sinceDays);

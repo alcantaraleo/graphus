@@ -25,14 +25,16 @@ public final class ModuleDepsTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_module_deps",
-                "Return the module dependency graph. Optional 'module' filter scopes output to a single module's dependencies.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_module_deps")
+                .description("Return the module dependency graph. Optional 'module' filter scopes output to a single module's dependencies.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
-                String moduleFilter = (String) arguments.get("module");
+                Map<String, Object> args = request.arguments();
+                String moduleFilter = (String) args.get("module");
                 CallGraph callGraph = ctx.callGraph();
 
                 Set<String> allModuleIds = callGraph.getNodes().stream()

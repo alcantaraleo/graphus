@@ -21,14 +21,16 @@ public final class CallersTool {
     }
 
     public SyncToolSpecification spec() {
-        Tool tool = new Tool(
-                "graphus_callers",
-                "Find the direct (depth-1) callers of a symbol using the call graph.",
-                INPUT_SCHEMA);
+        Tool tool = Tool.builder()
+                .name("graphus_callers")
+                .description("Find the direct (depth-1) callers of a symbol using the call graph.")
+                .inputSchema(ctx.jsonMapper(), INPUT_SCHEMA)
+                .build();
 
-        return new SyncToolSpecification(tool, (exchange, arguments) -> {
+        return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
-                String symbolInput = (String) arguments.get("symbol");
+                Map<String, Object> args = request.arguments();
+                String symbolInput = (String) args.get("symbol");
                 CallGraph callGraph = ctx.callGraph();
 
                 String resolved = resolveSymbol(callGraph, symbolInput);
