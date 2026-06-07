@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/alcantaraleo/graphus/compare/v0.9.0...v0.9.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **cli:** route progress bar output to stderr for MCP serve ([#91](https://github.com/alcantaraleo/graphus/issues/91)) ([a99f090](https://github.com/alcantaraleo/graphus/commit/a99f0908d62c8111a7adc9625ba3217c5660a265))
+
 ## [0.9.0](https://github.com/alcantaraleo/graphus/compare/v0.8.0...v0.9.0) (2026-05-22)
 
 
