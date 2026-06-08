@@ -43,7 +43,7 @@ dependencies {
     annotationProcessor("info.picocli:picocli-codegen:4.7.7")
     implementation("org.slf4j:slf4j-simple:2.0.18")
     implementation("io.modelcontextprotocol.sdk:mcp:0.10.0")
-    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.mockito:mockito-core:5.23.0")
 }
 
 application {
