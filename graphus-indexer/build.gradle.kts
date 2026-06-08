@@ -10,5 +10,5 @@ dependencies {
     implementation("dev.langchain4j:langchain4j-embeddings-all-minilm-l6-v2:1.15.0-beta25")
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.3")
-    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("org.slf4j:slf4j-api:2.0.18")
 }
